@@ -3,8 +3,8 @@
 Interfaz con React, TypeScript, Grommet y Vite para el proyecto Horus GrabCut.
 La aplicación permite elegir entre los casos de `../data/images/`, con
 `VS-SEG-018` como selección inicial si está disponible. El visor indica los
-estados de carga y error. La ROI y el motor de segmentación todavía no están
-implementados.
+estados de carga y error y permite dibujar, mover y redimensionar una ROI.
+El motor de segmentación todavía no está implementado.
 
 ## Desarrollo local
 
@@ -29,6 +29,7 @@ npm globales. `package-lock.json` fija las versiones para `npm ci`.
 
 ```bash
 npm run lint
+npm test
 npm run build
 npm run preview
 ```
@@ -70,7 +71,9 @@ ejecuta `npm run catalog` o reinicia `npm run dev`.
 - `src/main.tsx`: monta React y mantiene `StrictMode` para desarrollo.
 - `src/App.tsx`: caso seleccionado, composición de la pantalla y tema.
 - `src/components/CaseSelector.tsx`: selector controlado de casos.
-- `src/components/CaseImage.tsx`: imagen y estados de carga/error.
+- `src/components/RoiEditor.tsx`: imagen, selección de ROI y estados de carga/error.
+- `src/core/roi.ts`: coordenadas, límites, movimiento y ajuste de la ROI.
+- `tests/roi.test.mjs`: pruebas de geometría con el runner integrado de Node.
 - `src/data/cases.ts`: tipos e importación del catálogo.
 - `scripts/generate-catalog.mjs`: generación del catálogo con Node.
 - `src/index.css`: estilos globales mínimos.
@@ -78,3 +81,19 @@ ejecuta `npm run catalog` o reinicia `npm run dev`.
 - `vite.config.ts`: integración de React, ruta base y archivos públicos.
 - `tsconfig*.json`: configuración de TypeScript.
 - `eslint.config.js`: reglas de revisión del código.
+
+## Selección de ROI
+
+Arrastra en cualquier dirección sobre la imagen para dibujar una ROI. Mueve el
+rectángulo desde su interior y ajusta su tamaño desde las cuatro esquinas.
+Las coordenadas se expresan en píxeles originales y se mantienen al cambiar el
+tamaño del visor. Los bordes derecho e inferior son exclusivos, como en NumPy.
+
+La interacción de la ROI se realiza sobre la imagen con el mouse; el único
+botón del editor es «Borrar ROI». La cancelación del puntero descarta el
+arrastre en curso y conserva la selección anterior. Un clic sin área tampoco
+elimina la selección existente.
+
+Cambiar de caso limpia la ROI. La selección permanece solo en memoria, sin
+modificar imágenes ni anotaciones del repositorio. Una ROI que ocupe toda la
+imagen muestra un aviso porque GrabCut necesitará muestras de fondo externas.

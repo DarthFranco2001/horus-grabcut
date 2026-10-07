@@ -1,0 +1,45 @@
+.roi-stage {
+  position: relative;
+  max-width: 100%;
+  line-height: 0;
+}
+
+.roi-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+}
+
+.roi-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+  cursor: crosshair;
+}
+
+.roi-rectangle {
+  fill: rgb(34 211 238 / 18%);
+  stroke: #22d3ee;
+  stroke-width: 2;
+  cursor: move;
+}
+
+.roi-handle {
+  fill: white;
+  stroke: #0891b2;
+  stroke-width: 2;
+}
+
+.roi-handle-nw,
+.roi-handle-se { cursor: nwse-resize; }
+.roi-handle-ne,
+.roi-handle-sw { cursor: nesw-resize; }
+
+.roi-summary {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}

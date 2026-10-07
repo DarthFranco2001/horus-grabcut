@@ -3,7 +3,8 @@ import { Box, Grommet, Heading, Paragraph, Text } from 'grommet'
 import type { ThemeType } from 'grommet'
 
 import { CaseSelector } from './components/CaseSelector'
-import { CaseImage } from './components/CaseImage'
+import { RoiEditor } from './components/RoiEditor'
+import type { Roi } from './core/roi'
 import { cases } from './data/cases'
 
 const theme: ThemeType = {
@@ -30,6 +31,13 @@ const initialCaseId =
 
 export default function App() {
   const [caseId, setCaseId] = useState(initialCaseId)
+  const [roi, setRoi] = useState<Roi | null>(null)
+
+  function selectCase(nextCaseId: string) {
+    if (nextCaseId === caseId) return
+    setCaseId(nextCaseId)
+    setRoi(null)
+  }
 
   const selectedCase = cases.find((imageCase) => imageCase.id === caseId)
 
@@ -74,7 +82,7 @@ export default function App() {
             <CaseSelector
               options={caseOptions}
               value={caseId}
-              onChange={setCaseId}
+              onChange={selectCase}
             />
 
             <Heading level={2} margin="none">
@@ -88,10 +96,12 @@ export default function App() {
                 : 'Sin anotación de referencia'}
             </Text>
 
-            <CaseImage
+            <RoiEditor
               key={caseId}
               src={imageUrl}
               caseId={caseId}
+              roi={roi}
+              onChange={setRoi}
             />
           </Box>
         </Box>
