@@ -1,5 +1,10 @@
+import { useState } from 'react'
 import { Box, Grommet, Heading, Paragraph, Text } from 'grommet'
 import type { ThemeType } from 'grommet'
+
+import { CaseSelector } from './components/CaseSelector'
+import { CaseImage } from './components/CaseImage'
+import { cases } from './data/cases'
 
 const theme: ThemeType = {
   global: {
@@ -16,10 +21,24 @@ const theme: ThemeType = {
   },
 }
 
-const caseId = 'VS-SEG-018'
-const imageUrl = `${import.meta.env.BASE_URL}images/${caseId}.png`
+const caseOptions = cases.map((imageCase) => imageCase.id)
+
+const initialCaseId =
+  cases.find((imageCase) => imageCase.id === 'VS-SEG-018')?.id ??
+  cases[0]?.id ??
+  ''
 
 export default function App() {
+  const [caseId, setCaseId] = useState(initialCaseId)
+
+  const selectedCase = cases.find((imageCase) => imageCase.id === caseId)
+
+  if (!selectedCase) {
+    return <p role="alert">No hay un caso disponible para mostrar.</p>
+  }
+
+  const imageUrl = `${import.meta.env.BASE_URL}${selectedCase.imagePath}`
+
   return (
     <Grommet theme={theme} full>
       <Box
@@ -52,29 +71,28 @@ export default function App() {
             pad="medium"
             gap="medium"
           >
+            <CaseSelector
+              options={caseOptions}
+              value={caseId}
+              onChange={setCaseId}
+            />
+
             <Heading level={2} margin="none">
               Caso {caseId}
             </Heading>
 
-            <Text>Imagen original del repositorio</Text>
+            <Text>
+              {cases.length} casos disponibles ·{' '}
+              {selectedCase.annotationPath
+                ? 'Anotación de referencia disponible'
+                : 'Sin anotación de referencia'}
+            </Text>
 
-            <Box
-              background="black"
-              round="small"
-              overflow="hidden"
-              align="center"
-              pad="small"
-            >
-              <img
-                src={imageUrl}
-                alt={`Resonancia magnética del caso ${caseId}`}
-                style={{
-                  display: 'block',
-                  maxWidth: '100%',
-                  height: 'auto',
-                }}
-              />
-            </Box>
+            <CaseImage
+              key={caseId}
+              src={imageUrl}
+              caseId={caseId}
+            />
           </Box>
         </Box>
       </Box>

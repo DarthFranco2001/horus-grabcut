@@ -1,8 +1,10 @@
 # Laboratorio GrabCut · Web
 
 Interfaz con React, TypeScript, Grommet y Vite para el proyecto Horus GrabCut.
-La base actual muestra el caso `VS-SEG-018` de `../data/images/`.
-El selector de casos, la ROI y el motor de segmentación todavía no están implementados.
+La aplicación permite elegir entre los casos de `../data/images/`, con
+`VS-SEG-018` como selección inicial si está disponible. El visor indica los
+estados de carga y error. La ROI y el motor de segmentación todavía no están
+implementados.
 
 ## Desarrollo local
 
@@ -51,10 +53,26 @@ const imageUrl = `${import.meta.env.BASE_URL}images/VS-SEG-018.png`
 La base `/horus-grabcut/` está preparada para la ruta del repositorio en
 GitHub Pages. El flujo de despliegue todavía no está configurado.
 
+## Catálogo de casos
+
+`npm run catalog` genera `src/generated/cases.json` a partir de los archivos
+`VS-SEG-XXX.png` de `../data/images/`. Cada entrada incluye su identificador,
+la ruta de la imagen y la ruta de su anotación en `../data/contours/`, o `null`
+si no existe. Las anotaciones no se usan para segmentar ni se cargan en el visor.
+
+Los comandos `dev`, `build` y `lint` generan el catálogo automáticamente
+mediante sus respectivos scripts `pre`. El JSON generado está ignorado por Git;
+no se edita manualmente. Al añadir imágenes con el servidor ya iniciado,
+ejecuta `npm run catalog` o reinicia `npm run dev`.
+
 ## Archivos principales
 
 - `src/main.tsx`: monta React y mantiene `StrictMode` para desarrollo.
-- `src/App.tsx`: pantalla inicial y tema de Grommet.
+- `src/App.tsx`: caso seleccionado, composición de la pantalla y tema.
+- `src/components/CaseSelector.tsx`: selector controlado de casos.
+- `src/components/CaseImage.tsx`: imagen y estados de carga/error.
+- `src/data/cases.ts`: tipos e importación del catálogo.
+- `scripts/generate-catalog.mjs`: generación del catálogo con Node.
 - `src/index.css`: estilos globales mínimos.
 - `index.html`: documento de entrada, idioma y metadatos.
 - `vite.config.ts`: integración de React, ruta base y archivos públicos.
