@@ -4,7 +4,8 @@ Interfaz con React, TypeScript, Grommet y Vite para el proyecto Horus GrabCut.
 La aplicación permite elegir entre los casos de `../data/images/`, con
 `VS-SEG-018` como selección inicial si está disponible. El visor indica los
 estados de carga y error y permite dibujar, mover y redimensionar una ROI.
-El motor de segmentación todavía no está implementado.
+La lectura de intensidades y la máscara inicial están implementadas.
+Los modelos gaussianos y el corte mínimo todavía no están implementados.
 
 ## Desarrollo local
 
@@ -70,9 +71,14 @@ ejecuta `npm run catalog` o reinicia `npm run dev`.
 
 - `src/main.tsx`: monta React y mantiene `StrictMode` para desarrollo.
 - `src/App.tsx`: caso seleccionado, composición de la pantalla y tema.
+- `src/components/SegmentationWorkspace.tsx`: ROI, píxeles, inicialización y vista del caso activo.
 - `src/components/CaseSelector.tsx`: selector controlado de casos.
 - `src/components/RoiEditor.tsx`: imagen, selección de ROI y estados de carga/error.
 - `src/core/roi.ts`: coordenadas, límites, movimiento y ajuste de la ROI.
+- `src/core/image.ts`: conversión RGBA a intensidades de 8 bits.
+- `src/core/initialization.ts`: etiquetas iniciales y representación binaria.
+- `src/browser/imageData.ts`: lectura Canvas y vista previa de la máscara.
+- `tests/initialization.test.mjs`: intensidades, límites, etiquetas y conteos.
 - `tests/roi.test.mjs`: pruebas de geometría con el runner integrado de Node.
 - `src/data/cases.ts`: tipos e importación del catálogo.
 - `scripts/generate-catalog.mjs`: generación del catálogo con Node.
@@ -97,3 +103,22 @@ elimina la selección existente.
 Cambiar de caso limpia la ROI. La selección permanece solo en memoria, sin
 modificar imágenes ni anotaciones del repositorio. Una ROI que ocupe toda la
 imagen muestra un aviso porque GrabCut necesitará muestras de fondo externas.
+
+## Inicialización
+
+Después de dibujar una ROI, pulsa **Inicializar**. La vista cambia a una máscara
+con blanco dentro de la ROI (región candidata) y negro fuera (fondo seguro).
+Los controles **Imagen** y **Máscara inicial** permiten alternar entre ambas.
+Se muestran los conteos de píxeles de las dos clases. Esta máscara todavía no
+es la segmentación de GrabCut.
+
+Canvas lee la imagen a su resolución original. Las imágenes actuales son PNG
+en escala de grises de 8 bits: sus intensidades se conservan exactamente.
+La conversión RGB usa luminancia redondeada; se rechazan imágenes transparentes.
+Los píxeles y etiquetas se almacenan en `Uint8Array`, con índice `y * width + x`.
+Las etiquetas son 0/1; se convierten a 0/255 solo para la vista previa.
+
+Cambiar o borrar la ROI descarta la inicialización y vuelve a la imagen.
+Cambiar de caso reinicia todo el estado mediante un componente con `key`.
+La ROI debe dejar al menos un píxel de fondo fuera: una selección que cubra
+toda la imagen no permite inicializar. Las anotaciones no intervienen.

@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react'
-import type { PointerEvent } from 'react'
+import type { PointerEvent, ReactNode } from 'react'
 import { Box, Button, Text } from 'grommet'
 import { createRoi, imagePoint, moveRoi, resizeRoi } from '../core/roi'
 import type { Corner, ImageSize, Point, Roi } from '../core/roi'
@@ -10,6 +10,10 @@ interface RoiEditorProps {
   caseId: string
   roi: Roi | null
   onChange: (roi: Roi | null) => void
+  onImageReady: (image: HTMLImageElement) => void
+  onImageError: () => void
+  maskUrl?: string
+  actions?: ReactNode
 }
 
 type Gesture = {
@@ -21,7 +25,7 @@ type Gesture = {
   | { mode: 'resize'; original: Roi; corner: Corner }
 )
 
-export function RoiEditor({ src, caseId, roi, onChange }: RoiEditorProps) {
+export function RoiEditor({ src, caseId, roi, onChange, onImageReady, onImageError, maskUrl, actions }: RoiEditorProps) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [size, setSize] = useState<ImageSize | null>(null)
   // undefined means no active gesture; null means a draft without area yet.
@@ -98,9 +102,9 @@ export function RoiEditor({ src, caseId, roi, onChange }: RoiEditorProps) {
   return (
     <Box gap="small">
       <Text id={instructionsId} size="small">
-        Arrastra sobre la imagen para dibujar una ROI. Arrastra su interior para
-        moverla o sus esquinas para ajustar el tamaño. Dibuja fuera del rectángulo
-        para reemplazarlo.
+        {maskUrl
+          ? 'Selecciona Imagen para volver a editar la ROI.'
+          : 'Arrastra para dibujar una ROI; mueve su interior o ajusta sus esquinas. Dibuja fuera para reemplazarla.'}
       </Text>
 
       <Box background="black" round="small" pad="small" align="center" aria-busy={status === 'loading'}>
@@ -113,13 +117,19 @@ export function RoiEditor({ src, caseId, roi, onChange }: RoiEditorProps) {
             src={src}
             alt={`Resonancia magnética del caso ${caseId}`}
             draggable={false}
+            aria-hidden={!!maskUrl}
+            style={{ visibility: maskUrl ? 'hidden' : undefined }}
             onLoad={(event) => {
               setSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })
               setStatus('ready')
+              onImageReady(event.currentTarget)
             }}
-            onError={() => { cancel(); setStatus('error'); onChange(null) }}
+            onError={() => { cancel(); setStatus('error'); onImageError() }}
           />
-          {status === 'ready' && size && (
+          {maskUrl && (
+            <img className="roi-mask" src={maskUrl} alt={`Máscara inicial del caso ${caseId}`} draggable={false} />
+          )}
+          {status === 'ready' && size && !maskUrl && (
             <svg
               ref={svgRef}
               className="roi-overlay"
@@ -159,8 +169,9 @@ export function RoiEditor({ src, caseId, roi, onChange }: RoiEditorProps) {
         </div>
       </Box>
 
-      <Box direction="row" gap="small" wrap>
+      <Box direction="row" gap="small" align="center" wrap>
         <Button label="Borrar ROI" disabled={!roi} onClick={() => { cancel(); onChange(null) }} />
+        {actions}
       </Box>
 
       <Text size="small">{size ? `Imagen original: ${size.width} × ${size.height} píxeles.` : 'Dimensiones pendientes.'}</Text>
