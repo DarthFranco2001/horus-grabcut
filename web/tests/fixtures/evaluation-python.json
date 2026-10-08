@@ -1,0 +1,595 @@
+{
+  "description": "Red-dominance extraction on all annotations; NumPy metrics on notebook prediction fixtures. No ROI clipping of ground truth.",
+  "numpyVersion": "2.5.3",
+  "opencvVersion": "5.0.0",
+  "fixtures": [
+    {
+      "caseId": "VS-SEG-001",
+      "width": 512,
+      "height": 512,
+      "annotationSha256": "ce27fd035cf324933e5210ead757ff977a1970ae9415c3cc5b16380f63e49986",
+      "rgbaSha256": "5b10bd32ab5cc714c8b3b79f5558af435fcc7339bd5244830a3165462d9a5de7",
+      "labelsSha256": "47898bfc21218280d3317583a7fe35400f12a76b9b3691d367b352456d9288fd",
+      "foregroundCount": 1690,
+      "runs": [
+        {
+          "k": 5,
+          "iteration": 1,
+          "roi": {
+            "x": 180,
+            "y": 180,
+            "width": 80,
+            "height": 70
+          },
+          "metrics": {
+            "falsePositives": 2471,
+            "falseNegatives": 1690,
+            "predictedCount": 2471,
+            "referenceCount": 1690,
+            "referenceOutsideRoi": 1690,
+            "mse": 0.015872955322265625,
+            "mseRoi": 0.44125
+          }
+        },
+        {
+          "k": 5,
+          "iteration": 2,
+          "roi": {
+            "x": 180,
+            "y": 180,
+            "width": 80,
+            "height": 70
+          },
+          "metrics": {
+            "falsePositives": 899,
+            "falseNegatives": 1690,
+            "predictedCount": 899,
+            "referenceCount": 1690,
+            "referenceOutsideRoi": 1690,
+            "mse": 0.009876251220703125,
+            "mseRoi": 0.16053571428571428
+          }
+        },
+        {
+          "k": 5,
+          "iteration": 3,
+          "roi": {
+            "x": 180,
+            "y": 180,
+            "width": 80,
+            "height": 70
+          },
+          "metrics": {
+            "falsePositives": 864,
+            "falseNegatives": 1690,
+            "predictedCount": 864,
+            "referenceCount": 1690,
+            "referenceOutsideRoi": 1690,
+            "mse": 0.00974273681640625,
+            "mseRoi": 0.15428571428571428
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "VS-SEG-002",
+      "width": 512,
+      "height": 512,
+      "annotationSha256": "06028b79784fe934b87762dbe2b0ddddc66303e67d5df63d3eb08c4e8a29d470",
+      "rgbaSha256": "bb342a7c938703b9826735d99ea09aac8ce16eff3088f863c50ec5a8f85364cd",
+      "labelsSha256": "b0dbca4af0c345790de9d3dfe21d062cf447132648aff67d6a0f484061b5d21d",
+      "foregroundCount": 927,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-003",
+      "width": 384,
+      "height": 384,
+      "annotationSha256": "95383a7e2ecf2fbf5e1ba20698cedbaef4fa6e7786e2e69ab3457c1d2bbad40d",
+      "rgbaSha256": "3ccadd53b583671874dc2ddbdc852786edd561bd7712ed3baf70da66ca05355e",
+      "labelsSha256": "f5a4ee50e6c8e8274cf8b075ce986a16efa0be49faa314b57f4b468ba4d71442",
+      "foregroundCount": 898,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-004",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "7cdd474fb3855539eaee33871509f53dcd2974ab5afc754fb1a80af814a4854f",
+      "rgbaSha256": "914a63f6975cb075ce4745cb77d6366f185071a50b18e449c56c8d79cfb6435c",
+      "labelsSha256": "ec1fa0af78ac545a123dcb7e62e648cebd81780e6f4da9216d3bc5b840685c50",
+      "foregroundCount": 522,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-005",
+      "width": 512,
+      "height": 512,
+      "annotationSha256": "b02f88da6027b04b9d94931c579d0ed600cbe4a82f4b95fb34ff3acef76035c2",
+      "rgbaSha256": "80d996e4bb258cb9f436404aac1186e951a78a78226d1fd489a7a5688bcd1362",
+      "labelsSha256": "c189a9604465f9622d8176f758b6838c05e07740c6bb764f3199e55bd112a79b",
+      "foregroundCount": 1289,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-006",
+      "width": 512,
+      "height": 512,
+      "annotationSha256": "df90e492255d84533057bc055520c35d03ce5a49ce2f614f4935d14c6e54cff6",
+      "rgbaSha256": "535075774a8205eeec8efc559cbdaca055b40720ea69dcdff4c74f9a3d4761e5",
+      "labelsSha256": "6cd9d704e09e82e11e0ab824c4c0121e7128a5b60e39b75f91e8ebd2fb23b4f1",
+      "foregroundCount": 1965,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-007",
+      "width": 512,
+      "height": 512,
+      "annotationSha256": "f865154b1c703d054adddd81b292876983ea8c52be719cbacb55d821eef25d13",
+      "rgbaSha256": "32ea5dcf1df56fe47a34dbd54e660730b11dddfb3903c8061ca39492dca1e33c",
+      "labelsSha256": "6e91aaa1ffbde2bb4c7b84a558084d6fd0e883994b5e49384826c19e861ae58f",
+      "foregroundCount": 2748,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-008",
+      "width": 512,
+      "height": 512,
+      "annotationSha256": "4d5e09b14f0222e8acc5f9ff5578f4825aac2e8f27b506b7bdc25a1a13a29776",
+      "rgbaSha256": "09108d619aee3f0c32fd642532542053cc07a4494f875a4dd23b48ac1285c0e4",
+      "labelsSha256": "689955bf065dd24b3666716040f9e75434d2ad5418990180391f1f31db67fa60",
+      "foregroundCount": 860,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-009",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "96222510ae3732fc97498814a884176701eb9b465ecb5a1823f4fe7fcb62dbc4",
+      "rgbaSha256": "687c3222a3c88d96c0dfa19f95853abed6db676dfc46c762c20188028f269177",
+      "labelsSha256": "c4dd0e85814e3b2a88f37f566267c25fd0a64067230bfcdc9bd35a62aeda6eb8",
+      "foregroundCount": 1429,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-010",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "76d3ab4a61ef132acf8c397a5f8ab5ce126f4a9703412fa3fc6897688456c2df",
+      "rgbaSha256": "42e0e3d56ba35de436dffc8f1dfddb086457322b5290643a217392b2edcd3c5f",
+      "labelsSha256": "648a9681ea9e0b51a7a6f4ba79eb7204f1a2f50e09cd258e3208848023ba75a4",
+      "foregroundCount": 2182,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-011",
+      "width": 512,
+      "height": 512,
+      "annotationSha256": "05a90e8674addbf12bebb813c430ccabfc42b30df6fa131fc5001e4dc1b2bd64",
+      "rgbaSha256": "b5a6f1e7a81bff272a2e5478f04795417d2b6068219686b0388f9e73fd6e6e81",
+      "labelsSha256": "86d23a0a82c4a6bde12361af47b81c1699c82808077f54a0cb2fc5b632bc3e77",
+      "foregroundCount": 2384,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-012",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "4fad39dfb86556490c60b0e3a113860d2c9d1b6111924ac5eba1b04a995c0ba5",
+      "rgbaSha256": "ab628ea04c30b6d0d4088a5f4c133a037e5c4f491ef643f3abb022f2466194d1",
+      "labelsSha256": "ee25988af353501fafd9fa2a45ed5c6034ea6ee530c33dd23c39ccc4a0430254",
+      "foregroundCount": 810,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-013",
+      "width": 512,
+      "height": 512,
+      "annotationSha256": "fbab2b6dd6ad6ec1c6860659e53c89cb10e1baefc533d1f46b73c58c243d1934",
+      "rgbaSha256": "de75a0c5056c3ce9509007cf4c047eeb3210a81c504a646ec5561bd1f0b28f43",
+      "labelsSha256": "afc4b82804fd7e9d8ea7ebb2fc9c5921373ceb5850e81d079989570c54b65aad",
+      "foregroundCount": 736,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-014",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "0834ffd7f200486f956c4ec3e13956c5e9669cc8c0b1e5dd7404489e044da06e",
+      "rgbaSha256": "4e8b387b3615b22c28434e7e4057eeae2b5befd1367632db00dc3275b4d78061",
+      "labelsSha256": "8f5b7080323d390abea1d233ebf4fd124a004eb8f443bb5faaa80acb0ef17cbb",
+      "foregroundCount": 836,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-015",
+      "width": 512,
+      "height": 512,
+      "annotationSha256": "8d2853e0cf196f386e322fb913d6322c32b42e75446c2144a1f8637166058267",
+      "rgbaSha256": "0e08894f38bb45a272bb66cf260b4713a5b86a10b12c51b6d1b74340333ab83e",
+      "labelsSha256": "690d201e2175d47c48e95e62be9c9ec116fbf6a0db142eb962cc11885bf5ef6d",
+      "foregroundCount": 1059,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-016",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "3be7873226e4e1c2747505b640721f5ba43315a6aee1ee0c4188b1245be2043e",
+      "rgbaSha256": "9ab89fc9f2cf958fe9bba65c97ab2abb6d931a3d61e428aa3f3597813dbb8d81",
+      "labelsSha256": "d5572bbbf0d11f95c0f5fe9c09566f4ac0df07108aeeea49da1b20812d1e6057",
+      "foregroundCount": 635,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-017",
+      "width": 512,
+      "height": 512,
+      "annotationSha256": "be6055ba1c8734328a59280dd511fec7eaf3e994295ba92f07dc950c3ed4f6c3",
+      "rgbaSha256": "4cd8a318fd7d4f40f244bd379660ce2acdbd2f577c34d508ad88e038be594802",
+      "labelsSha256": "3bbc4f35c443c9fcc12b842d22bb27ac898cccf4f54d831bb4a92c7664939bfe",
+      "foregroundCount": 2071,
+      "runs": [
+        {
+          "k": 1,
+          "iteration": 1,
+          "roi": {
+            "x": 250,
+            "y": 253,
+            "width": 89,
+            "height": 84
+          },
+          "metrics": {
+            "falsePositives": 263,
+            "falseNegatives": 175,
+            "predictedCount": 2159,
+            "referenceCount": 2071,
+            "referenceOutsideRoi": 0,
+            "mse": 0.00167083740234375,
+            "mseRoi": 0.058587479935794544
+          }
+        },
+        {
+          "k": 1,
+          "iteration": 2,
+          "roi": {
+            "x": 250,
+            "y": 253,
+            "width": 89,
+            "height": 84
+          },
+          "metrics": {
+            "falsePositives": 232,
+            "falseNegatives": 265,
+            "predictedCount": 2038,
+            "referenceCount": 2071,
+            "referenceOutsideRoi": 0,
+            "mse": 0.001895904541015625,
+            "mseRoi": 0.06647940074906367
+          }
+        },
+        {
+          "k": 1,
+          "iteration": 3,
+          "roi": {
+            "x": 250,
+            "y": 253,
+            "width": 89,
+            "height": 84
+          },
+          "metrics": {
+            "falsePositives": 232,
+            "falseNegatives": 298,
+            "predictedCount": 2005,
+            "referenceCount": 2071,
+            "referenceOutsideRoi": 0,
+            "mse": 0.00202178955078125,
+            "mseRoi": 0.07089352594970573
+          }
+        },
+        {
+          "k": 5,
+          "iteration": 1,
+          "roi": {
+            "x": 250,
+            "y": 253,
+            "width": 89,
+            "height": 84
+          },
+          "metrics": {
+            "falsePositives": 163,
+            "falseNegatives": 163,
+            "predictedCount": 2071,
+            "referenceCount": 2071,
+            "referenceOutsideRoi": 0,
+            "mse": 0.00124359130859375,
+            "mseRoi": 0.04360620652755484
+          }
+        },
+        {
+          "k": 5,
+          "iteration": 2,
+          "roi": {
+            "x": 250,
+            "y": 253,
+            "width": 89,
+            "height": 84
+          },
+          "metrics": {
+            "falsePositives": 180,
+            "falseNegatives": 199,
+            "predictedCount": 2052,
+            "referenceCount": 2071,
+            "referenceOutsideRoi": 0,
+            "mse": 0.001445770263671875,
+            "mseRoi": 0.050695559122525415
+          }
+        },
+        {
+          "k": 5,
+          "iteration": 3,
+          "roi": {
+            "x": 250,
+            "y": 253,
+            "width": 89,
+            "height": 84
+          },
+          "metrics": {
+            "falsePositives": 178,
+            "falseNegatives": 203,
+            "predictedCount": 2046,
+            "referenceCount": 2071,
+            "referenceOutsideRoi": 0,
+            "mse": 0.001453399658203125,
+            "mseRoi": 0.05096308186195827
+          }
+        },
+        {
+          "k": 8,
+          "iteration": 1,
+          "roi": {
+            "x": 250,
+            "y": 253,
+            "width": 89,
+            "height": 84
+          },
+          "metrics": {
+            "falsePositives": 206,
+            "falseNegatives": 154,
+            "predictedCount": 2123,
+            "referenceCount": 2071,
+            "referenceOutsideRoi": 0,
+            "mse": 0.001373291015625,
+            "mseRoi": 0.048154093097913325
+          }
+        },
+        {
+          "k": 8,
+          "iteration": 2,
+          "roi": {
+            "x": 250,
+            "y": 253,
+            "width": 89,
+            "height": 84
+          },
+          "metrics": {
+            "falsePositives": 178,
+            "falseNegatives": 197,
+            "predictedCount": 2052,
+            "referenceCount": 2071,
+            "referenceOutsideRoi": 0,
+            "mse": 0.001430511474609375,
+            "mseRoi": 0.05016051364365971
+          }
+        },
+        {
+          "k": 8,
+          "iteration": 3,
+          "roi": {
+            "x": 250,
+            "y": 253,
+            "width": 89,
+            "height": 84
+          },
+          "metrics": {
+            "falsePositives": 184,
+            "falseNegatives": 202,
+            "predictedCount": 2053,
+            "referenceCount": 2071,
+            "referenceOutsideRoi": 0,
+            "mse": 0.00147247314453125,
+            "mseRoi": 0.0516318887105404
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "VS-SEG-018",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "6715d08b89b675dc523d848150ca8f50b0971093aae5d3868ddcd4e6429ba13e",
+      "rgbaSha256": "952411e9b8e19867efb3aa055d0ba191e61fe4ab2938848c8d4add0b74eb56fd",
+      "labelsSha256": "1984a88ecdb54ca7f07ad435f4941d497851b09f3d01c6ef8ac7e6bca1213a0c",
+      "foregroundCount": 70,
+      "runs": [
+        {
+          "k": 5,
+          "iteration": 1,
+          "roi": {
+            "x": 140,
+            "y": 160,
+            "width": 90,
+            "height": 80
+          },
+          "metrics": {
+            "falsePositives": 3970,
+            "falseNegatives": 70,
+            "predictedCount": 3970,
+            "referenceCount": 70,
+            "referenceOutsideRoi": 70,
+            "mse": 0.020129145408163265,
+            "mseRoi": 0.5513888888888889
+          }
+        },
+        {
+          "k": 5,
+          "iteration": 2,
+          "roi": {
+            "x": 140,
+            "y": 160,
+            "width": 90,
+            "height": 80
+          },
+          "metrics": {
+            "falsePositives": 4017,
+            "falseNegatives": 70,
+            "predictedCount": 4017,
+            "referenceCount": 70,
+            "referenceOutsideRoi": 70,
+            "mse": 0.02036332110969388,
+            "mseRoi": 0.5579166666666666
+          }
+        },
+        {
+          "k": 5,
+          "iteration": 3,
+          "roi": {
+            "x": 140,
+            "y": 160,
+            "width": 90,
+            "height": 80
+          },
+          "metrics": {
+            "falsePositives": 4018,
+            "falseNegatives": 70,
+            "predictedCount": 4018,
+            "referenceCount": 70,
+            "referenceOutsideRoi": 70,
+            "mse": 0.020368303571428572,
+            "mseRoi": 0.5580555555555555
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "VS-SEG-019",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "b4857790753d35a1160a1168712a0d6ac0a7ecee3c0bf5edd0c1c34b1b41a3b6",
+      "rgbaSha256": "b09d4312dacdf030f6b87449e5e6bf0c9f6d676a15bb2ce85d3c31de0f7847a4",
+      "labelsSha256": "55c0934cdfc7a96d80a5ab0658c109068e36a15c0a15fa13f80d765fcaa94537",
+      "foregroundCount": 1923,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-020",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "bf3146db3c9bc32924d582c6f2e8c59b039e679afa44e79aedf776cec3ba575e",
+      "rgbaSha256": "c04fe733384b4f104c6054284fd530fd9b2929ce0084aca26021162345ac551c",
+      "labelsSha256": "5c0e3b4303a281a4bf661d81c1fbe645fd00cc06750412672653338337884f5d",
+      "foregroundCount": 379,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-021",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "3da844be731e0c330adcd1fb78c40965c05610592ad3b71d41dd38284be486ba",
+      "rgbaSha256": "7bf253ec7286773b0033834b89284928817922392f0863f3cf78d32a1355519a",
+      "labelsSha256": "fcf558d450c42c02f5f01540626b9c5484e9beca25088ff673d2b7c09e42920f",
+      "foregroundCount": 1554,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-022",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "0230fb0b298ead9ebce8028d8270d5ef580c8847438efab8076462b1d242fe8b",
+      "rgbaSha256": "88c1589ba72de7d58e0abd962fdf2d6741849251128698169748d2e1a14e75ba",
+      "labelsSha256": "d8e36e7e0c4a0840bc080b1b39d4c34ce7f3f8f09fb2f980a1306b300d6ed8b6",
+      "foregroundCount": 419,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-023",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "65c2b7890e752114086b58035d6c18ecfa81fb8a4bbf59ae83bef7c31ab5c046",
+      "rgbaSha256": "1c41b216b588983fa62448c069d7234bcba4e901c713a007e1d9fd5b99e4a2f8",
+      "labelsSha256": "2a7a021dc23947ae5b17ae518009df0b9d18cbb352eda945d6ec56649a07f31f",
+      "foregroundCount": 498,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-024",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "d69742b0ff4a2f426ad3e7b54e026cd1b6f9dc165903f63128fcfed2f60dfcf5",
+      "rgbaSha256": "bc1beeff92c01e03386af71faf15737727d398a50048c4851dc573a0abb2a46a",
+      "labelsSha256": "26787c8a9378e8af7454269d94c26d13e65cf519ad4dab3092aaae2e0b4937b0",
+      "foregroundCount": 1539,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-025",
+      "width": 512,
+      "height": 512,
+      "annotationSha256": "20e2f389d238ba3a43c920fd8c34df8223528b5fcc6a639b69f6f84dc40a3f83",
+      "rgbaSha256": "e0a70889866539128c10446beefffd6c8ed734985db5098c36e945a63913a456",
+      "labelsSha256": "f1f5ba3b1403ea3e92bee89a1cbfb255e750b89c48796a984478886f99440446",
+      "foregroundCount": 891,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-026",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "9b92378cd573c2f766102d6ee29f3496f14a62f6cf11a3ea57d5800b87baa1c6",
+      "rgbaSha256": "62fa76d356a22a29039c0f9d9c90e0bb9bc8b1f7e1818d526da0c23ff842302a",
+      "labelsSha256": "7716f57f9166f9d651c775dd0e1254b29f6b0c4e592ed07b7b97880f8b00bd83",
+      "foregroundCount": 849,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-027",
+      "width": 512,
+      "height": 512,
+      "annotationSha256": "3221344cd1e274fbedb0997831cb7d38c8faba03d88dbdb457d582ea1855dcac",
+      "rgbaSha256": "030449bf50c5fd8d6221b83f08dce0073ae85d6fb411bfb53cb5977fe8019123",
+      "labelsSha256": "5f90e1712e7ced9adec2e864db1d5d7772b41ccaf72a64b5f940a1ed2632e0fb",
+      "foregroundCount": 778,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-028",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "68e6bd6070a2cc58c1319eff9ca1d8d73aa5bc019efb6815224003db26cc5c15",
+      "rgbaSha256": "aa2f19673542373804ebbb085a6631633e418ac38557f135261a2d87d058df45",
+      "labelsSha256": "41fb0e5a159ee8c63bdf9188330259974abaabcf99e89c7766bbb378cc99c844",
+      "foregroundCount": 456,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-029",
+      "width": 512,
+      "height": 512,
+      "annotationSha256": "72ab6d92deee354f1ce8a24a926772cec5ecbd97b076b1a2ff93bafab915076c",
+      "rgbaSha256": "e3be56cbd893da26353ae80f7a7537e9c2db22a7575942cb7570d526b457df52",
+      "labelsSha256": "acc45da59f55638541a1df830f15a7f9b75f0f7f7bacef36dc1f640f91f827a9",
+      "foregroundCount": 1660,
+      "runs": []
+    },
+    {
+      "caseId": "VS-SEG-030",
+      "width": 448,
+      "height": 448,
+      "annotationSha256": "76c81c670bba2a8654018402a50510ac18b81afbe55b34663ee97b9f927a7690",
+      "rgbaSha256": "8a923b4a96e2fdc8149f6f9746bb0c431915427432168930319789e4515f769c",
+      "labelsSha256": "960b2c04200acdd70bf6269d3de1f0b35e87426258da00645014712fcbe9dacf",
+      "foregroundCount": 2279,
+      "runs": []
+    }
+  ]
+}
