@@ -6,6 +6,7 @@ import { CaseSelector } from './components/CaseSelector'
 import { SegmentationWorkspace } from './components/SegmentationWorkspace'
 import { cases } from './data/cases'
 import { DEFAULT_COMPONENTS } from './core/gmm'
+import { DEFAULT_ITERATIONS } from './browser/segmentationJob'
 
 const theme: ThemeType = {
   global: {
@@ -32,6 +33,7 @@ const initialCaseId =
 export default function App() {
   const [caseId, setCaseId] = useState(initialCaseId)
   const [components, setComponents] = useState(DEFAULT_COMPONENTS)
+  const [iterations, setIterations] = useState(DEFAULT_ITERATIONS)
 
   function selectCase(nextCaseId: string) {
     if (nextCaseId === caseId) return
@@ -101,6 +103,8 @@ export default function App() {
               caseId={caseId}
               components={components}
               onComponentsChange={setComponents}
+              iterations={iterations}
+              onIterationsChange={setIterations}
             />
           </Box>
         </Box>

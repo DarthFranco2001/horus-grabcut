@@ -9,13 +9,16 @@ import type { Roi } from '../core/roi'
 import { validateComponentCount } from '../core/gmm'
 import type { AppearanceResult } from '../core/gmm'
 import type { IterationResult } from '../core/grabcut'
-import type { SegmentationRequest, SegmentationResponse } from '../workers/segmentation.types'
+import type { SegmentationRequest } from '../workers/segmentation.types'
+import { MAX_ITERATIONS, startSegmentationJob } from '../browser/segmentationJob'
 
 interface SegmentationWorkspaceProps {
   src: string
   caseId: string
   components: number
   onComponentsChange: (k: number) => void
+  iterations: number
+  onIterationsChange: (iterations: number) => void
 }
 
 interface Initialization {
@@ -23,9 +26,16 @@ interface Initialization {
   previewUrl: string
 }
 
+interface RunProgress {
+  completed: number
+  total: number
+  status: 'running' | 'stopped' | 'complete' | 'failed'
+}
+
+const iterationOptions = Array.from({ length: MAX_ITERATIONS }, (_, i) => i + 1)
 const componentOptions = Array.from({ length: 10 }, (_, i) => i + 1)
 
-export function SegmentationWorkspace({ src, caseId, components, onComponentsChange }: SegmentationWorkspaceProps) {
+export function SegmentationWorkspace({ src, caseId, components, onComponentsChange, iterations, onIterationsChange }: SegmentationWorkspaceProps) {
   const [roi, setRoi] = useState<Roi | null>(null)
   const [image, setImage] = useState<GrayscaleImage | null>(null)
   const [initialization, setInitialization] = useState<Initialization | null>(null)
@@ -34,23 +44,25 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
   const [appearance, setAppearance] = useState<AppearanceResult | null>(null)
   const [segmentation, setSegmentation] = useState<(IterationResult & { previewUrl: string }) | null>(null)
   const [busy, setBusy] = useState<'initialize' | 'iterate' | null>(null)
-  const workerRef = useRef<Worker | null>(null)
+  const [progress, setProgress] = useState<RunProgress | null>(null)
+  const jobRef = useRef<ReturnType<typeof startSegmentationJob> | null>(null)
 
   useEffect(() => () => {
-    workerRef.current?.terminate()
-    workerRef.current = null
+    jobRef.current?.stop()
+    jobRef.current = null
   }, [])
 
-  function stopWorker() {
-    workerRef.current?.terminate()
-    workerRef.current = null
+  function stopJob() {
+    jobRef.current?.stop()
+    jobRef.current = null
     setBusy(null)
   }
 
   function resetCalculation() {
-    stopWorker()
+    stopJob()
     setAppearance(null)
     setSegmentation(null)
+    setProgress(null)
   }
 
   function changeComponents(k: number) {
@@ -61,7 +73,6 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
     setView('image')
     setError(null)
   }
-
 
   function changeRoi(next: Roi | null) {
     if (roi?.x === next?.x && roi?.y === next?.y
@@ -95,46 +106,50 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
     setError(null)
   }
 
-  function runWorker(request: SegmentationRequest) {
-    stopWorker()
+  function stopExecution() {
+    stopJob()
+    setProgress((previous) => previous ? { ...previous, status: 'stopped' } : null)
+  }
+
+  function runWorker(request: SegmentationRequest, total = 1) {
+    stopJob()
     setError(null)
     setBusy(request.action)
+    setProgress(request.action === 'iterate' ? { completed: 0, total, status: 'running' } : null)
     try {
-      const worker = new Worker(new URL('../workers/segmentation.worker.ts', import.meta.url), { type: 'module' })
-      workerRef.current = worker
-      worker.onmessage = (event: MessageEvent<SegmentationResponse>) => {
-        // Ignore any message queued by a calculation invalidated by a new ROI/K/case.
-        if (workerRef.current !== worker) return
-        stopWorker()
-        const response = event.data
-        if (!response.ok) { setError(response.error); return }
-        try {
-          if (response.action === 'initialize') setAppearance(response.result)
-          else if (request.action === 'iterate') {
-            const result = response.result
-            const previewUrl = createMaskPreview({ ...request.image, labels: result.labels })
-            setSegmentation({ ...result, previewUrl })
-            setAppearance(result.appearance)
-            setView('mask')
-          }
-        } catch (cause) {
-          setError(cause instanceof Error ? cause.message : 'No se pudo mostrar el resultado.')
-        }
-      }
-      worker.onerror = () => {
-        if (workerRef.current !== worker) return
-        stopWorker()
-        setError('No se pudo completar el cálculo. Puedes volver a intentarlo.')
-      }
-      worker.onmessageerror = () => {
-        if (workerRef.current !== worker) return
-        stopWorker()
-        setError('No se pudo recibir el resultado. Puedes volver a intentarlo.')
-      }
-      // Structured cloning preserves the current image, labels and models for retry/cancellation.
-      worker.postMessage(request)
+      jobRef.current = startSegmentationJob(
+        () => new Worker(new URL('../workers/segmentation.worker.ts', import.meta.url), { type: 'module' }),
+        request,
+        total,
+        {
+          onResult(response, completed) {
+            if (response.action === 'initialize') setAppearance(response.result)
+            else if (request.action === 'iterate') {
+              const result = response.result
+              const previewUrl = createMaskPreview({ ...request.image, labels: result.labels })
+              setSegmentation({ ...result, previewUrl })
+              setAppearance(result.appearance)
+              setProgress({ completed, total, status: 'running' })
+              // Switch once; a user viewing the original can keep that view during later cuts.
+              if (completed === 1) setView('mask')
+            }
+          },
+          onComplete() {
+            jobRef.current = null
+            setBusy(null)
+            setProgress((previous) => previous ? { ...previous, status: 'complete' } : null)
+          },
+          onError(message) {
+            jobRef.current = null
+            setBusy(null)
+            setProgress((previous) => previous ? { ...previous, status: 'failed' } : null)
+            setError(message)
+          },
+        },
+      )
     } catch (cause) {
-      stopWorker()
+      stopJob()
+      setProgress((previous) => previous ? { ...previous, status: 'failed' } : null)
       setError(cause instanceof Error ? cause.message : 'No se pudo iniciar el cálculo.')
     }
   }
@@ -156,13 +171,13 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
     }
   }
 
-  function iterate() {
+  function iterate(total = 1) {
     if (!image || !roi || !initialization || !appearance || busy) return
     runWorker({
       action: 'iterate', image, roi, appearance,
       labels: segmentation?.labels ?? initialization.result.labels,
       completed: segmentation?.iteration ?? 0,
-    })
+    }, total)
   }
 
   const coversImage = !!(image && roi && roi.width === image.width && roi.height === image.height)
@@ -182,6 +197,21 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
           />
         </Box>
       </Box>
+      <Box direction="row" align="center" gap="small" wrap>
+        <label htmlFor="run-iterations">Máximo de iteraciones</label>
+        <Box width="xsmall">
+          <Select
+            id="run-iterations"
+            options={iterationOptions}
+            value={iterations}
+            disabled={busy !== null}
+            onChange={({ option }: { option: unknown }) => {
+              if (typeof option === 'number' && iterationOptions.includes(option)) onIterationsChange(option)
+            }}
+          />
+        </Box>
+        <Text size="small">Por ejecución; continúa desde la última máscara.</Text>
+      </Box>
       <RoiEditor
         src={src}
         caseId={caseId}
@@ -199,11 +229,20 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
               onClick={initialize}
             />
             <Button
-              label={busy === 'iterate' ? 'Calculando…' : 'Ejecutar una iteración'}
-              primary={appearance !== null}
+              label="Ejecutar una iteración"
               disabled={!appearance || busy !== null}
-              onClick={iterate}
+              onClick={() => iterate()}
             />
+            {busy === 'iterate' ? (
+              <Button label="Detener" onClick={stopExecution} />
+            ) : (
+              <Button
+                label="Ejecutar"
+                primary={appearance !== null}
+                disabled={!appearance || busy !== null}
+                onClick={() => iterate(iterations)}
+              />
+            )}
             {initialization && (
               <RadioButtonGroup
                 name="image-view"
@@ -221,7 +260,15 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
           </>
         )}
       />
-      {busy && <Text role="status" size="small">{busy === 'initialize' ? 'Preparando modelos de apariencia…' : 'Calculando el corte mínimo…'}</Text>}
+      {busy === 'initialize' && <Text role="status" size="small">Preparando modelos de apariencia…</Text>}
+      {progress && (
+        <Text role="status" size="small">
+          {progress.status === 'running' && `Iteración ${Math.min(progress.completed + 1, progress.total)} de ${progress.total}…`}
+          {progress.status === 'complete' && `Ejecución completada: ${progress.completed} de ${progress.total} ${progress.total === 1 ? 'iteración' : 'iteraciones'}.`}
+          {progress.status === 'stopped' && `Ejecución detenida: ${progress.completed} de ${progress.total} ${progress.total === 1 ? 'iteración completada' : 'iteraciones completadas'}. Se conserva la última máscara terminada.`}
+          {progress.status === 'failed' && `Ejecución interrumpida: ${progress.completed} de ${progress.total} ${progress.total === 1 ? 'iteración completada' : 'iteraciones completadas'}. Se conserva la última máscara terminada.`}
+        </Text>
+      )}
       {appearance && !segmentation && !busy && <Text role="status" size="small">Modelos de apariencia preparados · K = {appearance.k}.</Text>}
       {error && <Text role="alert" color="status-critical">{error}</Text>}
       {segmentation && (

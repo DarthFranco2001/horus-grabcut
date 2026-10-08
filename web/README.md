@@ -5,7 +5,8 @@ La aplicación permite elegir entre los casos de `../data/images/`, con
 `VS-SEG-018` como selección inicial si está disponible. El visor indica los
 estados de carga y error y permite dibujar, mover y redimensionar una ROI.
 La aplicación permite inicializar los modelos gaussianos y ejecutar GrabCut
-una iteración a la vez, con vecindad de ocho píxeles y corte mínimo. Todo el
+paso a paso o en ejecuciones de varias iteraciones, con vecindad de ocho
+píxeles y corte mínimo. Todo el
 cálculo ocurre en el navegador; no necesita un servidor de procesamiento.
 
 ## Desarrollo local
@@ -84,6 +85,8 @@ ejecuta `npm run catalog` o reinicia `npm run dev`.
 - `src/core/grabcut.ts`: una iteración de reajuste y corte.
 - `src/workers/segmentation.worker.ts`: inicialización e iteraciones fuera del hilo de la interfaz.
 - `src/browser/imageData.ts`: lectura Canvas y vista previa de la máscara.
+- `src/browser/segmentationJob.ts`: ejecución secuencial, cancelación y manejo de errores.
+- `tests/segmentation-job.test.mjs`: límites, continuación y resultados tardíos de un worker cancelado.
 - `tests/initialization.test.mjs`: intensidades, límites, etiquetas y conteos.
 - `tests/roi.test.mjs`: pruebas de geometría con el runner integrado de Node.
 - `src/data/cases.ts`: tipos e importación del catálogo.
@@ -232,5 +235,38 @@ npm test
 
 El generador extrae las funciones numéricas y los bloques espaciales del
 cuaderno sin ejecutar su interfaz. Las pruebas habituales solo necesitan Node.
-No se han añadido dependencias. La ejecución automática de varias iteraciones,
+No se han añadido dependencias. La superposición sobre la imagen original,
 la evaluación contra anotaciones y la exportación quedan para pasos posteriores.
+
+## Ejecución automática y detención
+
+**Máximo de iteraciones** permite elegir entre 1 y 20, con 5 por defecto.
+El límite se aplica a cada pulsación de **Ejecutar**: se calculan esa cantidad
+de iteraciones nuevas desde la máscara actual. Por ejemplo, si has completado
+2 iteraciones manuales y ejecutas otras 5, el resultado final será la iteración
+7. El progreso **Iteración 3 de 5** corresponde a la ejecución en curso; el
+contador junto al tamaño del objeto acumula todas las iteraciones completadas.
+
+Cada resultado actualiza la máscara y los conteos antes de pedir el siguiente
+corte. La ejecución termina al alcanzar el límite; no se detiene automáticamente
+por una máscara sin cambios, porque los modelos aún pueden seguir ajustándose.
+**Ejecutar una iteración** sigue disponible para avanzar manualmente.
+
+Durante un cálculo aparece **Detener** y se deshabilitan los botones de nueva
+ejecución y el selector del límite. Detener termina el worker, descarta el corte
+en curso y conserva la última máscara y los modelos aceptados. Si todavía no
+terminó ningún corte, conserva el estado anterior, incluida la máscara inicial.
+Después puedes continuar manualmente o iniciar otra ejecución automática.
+Un fallo también conserva el último resultado para poder reintentar.
+
+Cambiar el máximo conserva la segmentación y solo afecta a la próxima ejecución.
+El máximo seleccionado se conserva al cambiar de caso, igual que K. Cambiar K,
+modificar/borrar la ROI o cambiar de caso cancela la ejecución y descarta la
+segmentación anterior. Los mensajes tardíos de un worker cancelado se ignoran.
+
+El controlador reutiliza un worker por ejecución y envía una solicitud a la vez.
+El resultado aceptado aporta las etiquetas, modelos y número acumulado para la
+siguiente solicitud; no se reinicializan los GMM entre pasos. Las pruebas cubren
+el límite exacto, la continuidad de datos, la ausencia de parada prematura,
+la cancelación antes/después del primer resultado y los errores de envío,
+cálculo, recepción o presentación, sin añadir dependencias de pruebas.
