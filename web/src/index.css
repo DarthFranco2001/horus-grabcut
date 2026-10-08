@@ -1,3 +1,7 @@
+:root {
+  --color-accent: #22d3ee;
+}
+
 html,
 body,
 #root {

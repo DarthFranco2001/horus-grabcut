@@ -2,12 +2,13 @@
 
 Interfaz con React, TypeScript, Grommet y Vite para el proyecto Horus GrabCut.
 La aplicación permite elegir entre los casos de `../data/images/`, con
-`VS-SEG-018` como selección inicial si está disponible. El visor indica los
+`VS-SEG-001` como selección inicial si está disponible. El visor indica los
 estados de carga y error y permite dibujar, mover y redimensionar una ROI.
-La aplicación permite inicializar los modelos gaussianos y ejecutar GrabCut
-paso a paso o en ejecuciones de varias iteraciones, con vecindad de ocho
-píxeles y corte mínimo. Todo el
+Una sola acción prepara los modelos gaussianos y ejecuta las iteraciones de
+GrabCut seleccionadas, con vecindad de ocho píxeles y corte mínimo. Todo el
 cálculo ocurre en el navegador; no necesita un servidor de procesamiento.
+Las anotaciones del repositorio permiten visualizar la referencia y evaluar
+la segmentación de cada caso.
 
 ## Desarrollo local
 
@@ -62,7 +63,8 @@ GitHub Pages. El flujo de despliegue todavía no está configurado.
 `npm run catalog` genera `src/generated/cases.json` a partir de los archivos
 `VS-SEG-XXX.png` de `../data/images/`. Cada entrada incluye su identificador,
 la ruta de la imagen y la ruta de su anotación en `../data/contours/`, o `null`
-si no existe. Las anotaciones no se usan para segmentar ni se cargan en el visor.
+si no existe. Las anotaciones se cargan para visualizar y evaluar la referencia;
+no se usan como entrada del algoritmo de segmentación.
 
 Los comandos `dev`, `build` y `lint` generan el catálogo automáticamente
 mediante sus respectivos scripts `pre`. El JSON generado está ignorado por Git;
@@ -86,6 +88,12 @@ ejecuta `npm run catalog` o reinicia `npm run dev`.
 - `src/workers/segmentation.worker.ts`: inicialización e iteraciones fuera del hilo de la interfaz.
 - `src/browser/imageData.ts`: lectura Canvas y vista previa de la máscara.
 - `src/browser/segmentationJob.ts`: ejecución secuencial, cancelación y manejo de errores.
+- `src/browser/grabcutJob.ts`: encadena inicialización y cortes en una sola acción.
+- `src/components/SegmentationWorkspace.css`: botonera adaptable y estados seleccionados.
+- `src/core/evaluation.ts`: extracción de referencia y métricas de máscaras.
+- `src/browser/groundTruth.ts`: carga y lectura de anotaciones a resolución nativa.
+- `src/hooks/useGroundTruth.ts`: estados de carga, cancelación y reintento por caso.
+- `src/components/ReferenceComparison.tsx`: métricas de evaluación con la referencia.
 - `tests/segmentation-job.test.mjs`: límites, continuación y resultados tardíos de un worker cancelado.
 - `tests/initialization.test.mjs`: intensidades, límites, etiquetas y conteos.
 - `tests/roi.test.mjs`: pruebas de geometría con el runner integrado de Node.
@@ -101,8 +109,9 @@ ejecuta `npm run catalog` o reinicia `npm run dev`.
 
 Arrastra en cualquier dirección sobre la imagen para dibujar una ROI. Mueve el
 rectángulo desde su interior y ajusta su tamaño desde las cuatro esquinas.
-Las coordenadas se expresan en píxeles originales y se mantienen al cambiar el
-tamaño del visor. Los bordes derecho e inferior son exclusivos, como en NumPy.
+Las coordenadas se almacenan internamente en píxeles originales y se mantienen
+al cambiar el tamaño del visor. Los bordes derecho e inferior son exclusivos,
+como en NumPy. La interfaz no muestra dimensiones ni coordenadas numéricas.
 
 La interacción de la ROI se realiza sobre la imagen con el mouse; el único
 botón del editor es «Borrar ROI». La cancelación del puntero descarta el
@@ -115,11 +124,9 @@ imagen muestra un aviso porque GrabCut necesitará muestras de fondo externas.
 
 ## Inicialización
 
-Después de dibujar una ROI, pulsa **Inicializar**. La vista cambia a una máscara
-con blanco dentro de la ROI (región candidata) y negro fuera (fondo seguro).
-Los controles **Imagen** y **Máscara inicial** permiten alternar entre ambas.
-Se muestran los conteos de píxeles de las dos clases. Esta máscara todavía no
-es la segmentación de GrabCut.
+Después de dibujar una ROI, pulsa **Segmentar**. Esta única acción prepara las
+etiquetas iniciales y los modelos, y ejecuta las iteraciones seleccionadas.
+La máscara rectangular inicial es interna; no hay un paso intermedio de ejecución.
 
 Canvas lee la imagen a su resolución original. Las imágenes actuales son PNG
 en escala de grises de 8 bits: sus intensidades se conservan exactamente.
@@ -134,16 +141,16 @@ toda la imagen no permite inicializar. Las anotaciones no intervienen.
 
 ## Modelos gaussianos y K
 
-El selector **Gaussianas por clase (K)** permite elegir entre 1 y 10 componentes,
-con 5 como valor inicial. K se conserva al cambiar de imagen. Cambiar K descarta
-la inicialización y los modelos anteriores, conserva la ROI y requiere pulsar
-**Inicializar** otra vez. Cada clase debe contener al menos K píxeles; no se
-reduce K silenciosamente cuando una selección es demasiado pequeña.
+El selector **Gaussianas (K)** permite elegir entre 1 y 10 componentes,
+con 5 como valor inicial. K se conserva al cambiar de imagen. K e Iteraciones
+se pueden editar durante la preparación; se deshabilitan al calcular y mostrar
+resultados. **Reiniciar** vuelve a habilitarlos y conserva la ROI. Cada clase
+debe contener al menos K píxeles; no se reduce K silenciosamente cuando una
+selección es demasiado pequeña.
 
-**Inicializar** prepara la máscara y, en un Web Worker, los GMM de fondo y región
-candidata. La interfaz confirma cuando los modelos están preparados. Las
-anotaciones de referencia no participan. La máscara permanece rectangular hasta
-pulsar **Ejecutar una iteración**.
+**Segmentar** prepara la máscara y, en un Web Worker, los GMM de fondo y región
+candidata. Después inicia automáticamente los cortes. Las anotaciones de
+referencia no participan.
 
 El portado reproduce `grabcut2.ipynb`: grupos de intensidades ordenadas con la
 misma distribución de tamaños que `np.array_split`, varianza poblacional más
@@ -183,19 +190,16 @@ no ejecuta sus celdas de interfaz ni modifica imágenes, anotaciones o notebooks
 
 ## Una iteración de GrabCut
 
-Tras inicializar, pulsa **Ejecutar una iteración**. La vista **Segmentación**
-muestra el objeto en blanco y el fondo en negro, junto con el número de
-iteración, los píxeles que cambiaron y el tamaño del objeto. Puedes repetir el
-botón para avanzar manualmente. **Imagen** permite volver al original y editar
-la ROI; modificarla, borrarla o cambiar K descarta todas las iteraciones.
+**Segmentar** calcula la cantidad de iteraciones seleccionada. Al terminar,
+**Imagen**, **Máscara** y **Recorte** permiten cambiar la visualización.
+**Reiniciar** descarta el resultado y permite volver a editar la ROI y parámetros.
 Cambiar de caso también cancela el worker y reinicia el resultado.
 
-La primera iteración utiliza los costos preparados por **Inicializar**, sin
+La primera iteración utiliza los costos preparados en la inicialización, sin
 repetir la primera asignación y actualización de GMM. Las siguientes reasignan
 componentes y reajustan los modelos con la última máscara antes de cortar.
 Una clase vacía conserva su modelo anterior, igual que el cuaderno. La interfaz
-avisa cuando no queda objeto o cuando una iteración no cambia la máscara;
-esto último no se presenta como una garantía de convergencia de los modelos.
+avisa cuando no queda objeto para que puedas ajustar la ROI o K.
 
 El término espacial reproduce `grabcut2.ipynb`: ocho vecinos, cada par una sola
 vez, distancias 1 y √2, beta calculado sobre los pares de **toda la imagen** y
@@ -235,38 +239,117 @@ npm test
 
 El generador extrae las funciones numéricas y los bloques espaciales del
 cuaderno sin ejecutar su interfaz. Las pruebas habituales solo necesitan Node.
-No se han añadido dependencias. La superposición sobre la imagen original,
-la evaluación contra anotaciones y la exportación quedan para pasos posteriores.
+No se han añadido dependencias. La exportación queda para un paso posterior.
 
-## Ejecución automática y detención
+## Flujo y detención
 
-**Máximo de iteraciones** permite elegir entre 1 y 20, con 5 por defecto.
-El límite se aplica a cada pulsación de **Ejecutar**: se calculan esa cantidad
-de iteraciones nuevas desde la máscara actual. Por ejemplo, si has completado
-2 iteraciones manuales y ejecutas otras 5, el resultado final será la iteración
-7. El progreso **Iteración 3 de 5** corresponde a la ejecución en curso; el
-contador junto al tamaño del objeto acumula todas las iteraciones completadas.
+La botonera usa el mismo turquesa de la ROI (`#22d3ee`), con fondo blanco y
+contorno turquesa. La vista seleccionada tiene fondo turquesa sólido y estado
+accesible `aria-pressed`. Los botones se centran y reparten en filas según el ancho.
 
-Cada resultado actualiza la máscara y los conteos antes de pedir el siguiente
-corte. La ejecución termina al alcanzar el límite; no se detiene automáticamente
-por una máscara sin cambios, porque los modelos aún pueden seguir ajustándose.
-**Ejecutar una iteración** sigue disponible para avanzar manualmente.
+- Preparación: **Borrar ROI** y **Segmentar**.
+- Cálculo: **Detener** y el progreso; los parámetros quedan bloqueados.
+- Visualización: **Reiniciar**, **Imagen**, **Máscara** y **Recorte**.
 
-Durante un cálculo aparece **Detener** y se deshabilitan los botones de nueva
-ejecución y el selector del límite. Detener termina el worker, descarta el corte
-en curso y conserva la última máscara y los modelos aceptados. Si todavía no
-terminó ningún corte, conserva el estado anterior, incluida la máscara inicial.
-Después puedes continuar manualmente o iniciar otra ejecución automática.
-Un fallo también conserva el último resultado para poder reintentar.
+**Iteraciones** permite elegir entre 1 y 20, con 5 por defecto. **Segmentar**
+siempre inicia desde la ROI y ejecuta exactamente esa cantidad de cortes.
+Cada resultado actualiza la imagen antes de pedir el siguiente corte. No se
+para automáticamente por una máscara sin cambios: los modelos pueden seguir
+ajustándose. El progreso desaparece al completarse.
 
-Cambiar el máximo conserva la segmentación y solo afecta a la próxima ejecución.
-El máximo seleccionado se conserva al cambiar de caso, igual que K. Cambiar K,
-modificar/borrar la ROI o cambiar de caso cancela la ejecución y descarta la
-segmentación anterior. Los mensajes tardíos de un worker cancelado se ignoran.
+**Detener** cancela el cálculo en curso y conserva el último resultado terminado.
+Si no terminó ningún corte, vuelve a preparación; si hay resultado, permite
+visualizarlo o reiniciar. Un fallo conserva igualmente los resultados aceptados.
+**Reiniciar** descarta la segmentación y métricas, conserva ROI y parámetros y
+vuelve a preparación. Cambiar de caso cancela todo y limpia la ROI. Los mensajes
+tardíos de un worker cancelado se ignoran.
 
-El controlador reutiliza un worker por ejecución y envía una solicitud a la vez.
-El resultado aceptado aporta las etiquetas, modelos y número acumulado para la
-siguiente solicitud; no se reinicializan los GMM entre pasos. Las pruebas cubren
-el límite exacto, la continuidad de datos, la ausencia de parada prematura,
-la cancelación antes/después del primer resultado y los errores de envío,
-cálculo, recepción o presentación, sin añadir dependencias de pruebas.
+El controlador termina el worker de inicialización antes de crear el de cortes.
+El segundo worker se reutiliza para todos los cortes y recibe una solicitud a
+la vez, con los modelos y etiquetas del resultado anterior. Las pruebas cubren
+el encadenamiento automático, número exacto de cortes, cancelación en ambas
+fases, errores de creación/cálculo y descarte de respuestas tardías.
+
+## Referencia y comparación
+
+Las imágenes de `data/contours/` contienen la anotación roja sobre la imagen
+original. Al seleccionar un caso, la aplicación carga su anotación, verifica
+que tenga las mismas dimensiones y extrae la referencia con `R > G && R > B`.
+No usa un umbral sobre la MRI, no rellena huecos ni recorta la referencia a la
+ROI. Los archivos del repositorio permanecen intactos. La referencia no se
+transfiere al worker de GrabCut ni altera sus modelos, etiquetas o parámetros.
+
+El visor ofrece las vistas disponibles según el estado:
+
+- **Imagen**: imagen original. Para editar la ROI, pulsa **Reiniciar**.
+- **Máscara**: etiquetas actuales en blanco y negro.
+- **Recorte**: intensidades originales del objeto sobre fondo negro. Los píxeles
+  excluidos permanecen transparentes en la vista previa generada. Conserva las dimensiones y posición originales; no
+  modifica la segmentación ni las métricas. Aparece tras el primer resultado y
+  se selecciona automáticamente al obtener el primer resultado.
+
+La ROI se edita durante la preparación, después de **Reiniciar**. La referencia se utiliza para calcular las
+métricas; no hay una vista de contornos superpuestos.
+
+Tras la primera iteración aparece **Evaluación · referencia médica**, con las
+mismas métricas de la sección 13.1 de `notebooks/grabcut2.ipynb`:
+
+- **Falsos positivos (FP)**: píxeles marcados como objeto por GrabCut, pero no por la referencia.
+- **Falsos negativos (FN)**: píxeles de referencia que GrabCut deja como fondo.
+- **MSE global**: `(FP + FN) / N`, con N igual al total de píxeles de la imagen.
+- **MSE en la ROI**: errores dentro de la ROI divididos por el área de la ROI.
+
+La evaluación muestra las métricas a la izquierda y la imagen de anotación
+médica original del repositorio a la derecha, con la altura del bloque de
+métricas y sin deformar sus proporciones. Las etiquetas están en negrita y los
+valores en texto normal. En espacios estrechos, la imagen pasa debajo de las
+métricas como miniatura de 160 píxeles de alto. Las cuatro cifras se muestran directamente. FP, FN y MSE global usan la
+**imagen completa**, sin recortar la referencia. El MSE opera sobre etiquetas
+0/1: contar desacuerdos equivale exactamente a promediar las diferencias al
+cuadrado. Se muestra con seis decimales, como en el cuaderno. Las dos máscaras
+vacías tienen FP = FN = MSE = 0, sin convenciones adicionales. Los píxeles de referencia fuera de ROI se muestran como contexto cuando los hay.
+No se evalúa la máscara rectangular inicial como si fuera el resultado.
+
+Cambiar o borrar la ROI o cambiar K elimina la evaluación anterior, pero
+conserva la referencia cargada. Cambiar de caso cancela la carga anterior;
+sus respuestas tardías se ignoran. Detener la ejecución conserva las métricas
+de la última máscara terminada. Una anotación ausente, inaccesible o con tamaño
+incompatible no impide usar GrabCut. Los errores de carga ofrecen **Reintentar
+referencia**, sin reiniciar la segmentación. No se redimensionan referencias
+incompatibles para forzar una comparación.
+
+`tests/fixtures/evaluation-python.json` verifica las 30 anotaciones, incluidos
+hashes de RGBA y etiquetas extraídas, y las métricas de 15 máscaras obtenidas
+del cuaderno. Los casos sintéticos cubren coincidencia, disjunción, máscaras
+vacías, errores fuera de ROI, selecciones ajenas al objeto y entradas inválidas. Las pruebas
+de carga comprueban errores de red/decodificación, tamaños incompatibles,
+cancelación y liberación del bitmap. Todo se prueba con Node sin dependencias
+nuevas; Python solo se usa para regenerar las referencias:
+
+```bash
+../.venv/bin/python scripts/generate-evaluation-fixtures.py
+npm test
+```
+
+## Auditoría de correspondencia con el cuaderno
+
+La referencia de implementación es `notebooks/grabcut2.ipynb`. La evaluación
+usa únicamente FP, FN y MSE global/ROI, como su sección 13.1. La extracción
+roja, las etiquetas 0/1 y la inclusión de referencia fuera de ROI coinciden con
+la sección 12; las pruebas contrastan las 30 anotaciones y 15 resultados.
+
+Las diferencias que permanecen son de alcance o interacción:
+
+| Aspecto | Cuaderno | Web |
+| --- | --- | --- |
+| Modelos y corte | Variante didáctica en grises, Dinic recursivo | Misma variante; Dinic con pila explícita y worker. Tres iteraciones contrastadas píxel a píxel en las referencias de prueba. |
+| Parámetros | K = 5, cinco iteraciones en el ejemplo; explora gamma y selecciona 10 | K de 1 a 10, ejecución de 1 a 20 pasos; defaults 5 y gamma fijo en 10. |
+| ROI | Convierte coordenadas con `int`, truncando | Redondea a píxeles y limita al borde; igual ROI entera produce el mismo cálculo. |
+| Acceso a referencia | Se muestra al final, después de segmentar | Se utiliza para las métricas después de la primera iteración; sigue fuera de los datos enviados al algoritmo. |
+| Contornos | Matplotlib interpola el nivel 0,5 y amplía la ROI | No se muestran contornos superpuestos; se conserva la vista de máscara. |
+| Comparadores | Didáctica, OpenCV y referencia trivial «todo fondo» | Solo resultado de nuestra implementación didáctica. |
+| Gráficas | Histogramas, energía, historial de máscaras y mapa de errores | Controles de uso, resultado actual y métricas; esas figuras no se han portado. |
+
+La energía de cada corte se minimiza con modelos fijos. Como en el cuaderno,
+el reajuste duro de los GMM no garantiza descenso del costo marginal entre
+iteraciones. Ninguna métrica de referencia interviene en el ajuste.

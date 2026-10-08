@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Box, Grommet, Heading, Paragraph, Text } from 'grommet'
+import { Box, Grommet, Heading } from 'grommet'
 import type { ThemeType } from 'grommet'
 
 import { CaseSelector } from './components/CaseSelector'
@@ -11,22 +11,30 @@ import { DEFAULT_ITERATIONS } from './browser/segmentationJob'
 const theme: ThemeType = {
   global: {
     colors: {
-      brand: '#2563eb',
+      brand: '#22d3ee',
+      focus: '#22d3ee',
+      control: '#22d3ee',
+      selected: '#22d3ee',
       background: '#f8fafc',
       text: '#0f172a',
     },
+    active: { background: 'brand', color: 'text' },
+    selected: { background: 'brand', color: 'text' },
+    control: { border: { color: 'brand' } },
+    focus: { border: { color: 'brand' } },
     font: {
       family: 'system-ui, sans-serif',
       size: '16px',
       height: '24px',
     },
   },
+  select: { icons: { color: 'brand' } },
 }
 
 const caseOptions = cases.map((imageCase) => imageCase.id)
 
 const initialCaseId =
-  cases.find((imageCase) => imageCase.id === 'VS-SEG-018')?.id ??
+  cases.find((imageCase) => imageCase.id === 'VS-SEG-001')?.id ??
   cases[0]?.id ??
   ''
 
@@ -66,10 +74,6 @@ export default function App() {
             <Heading level={1} margin="none">
               Laboratorio GrabCut
             </Heading>
-
-            <Paragraph margin="none" fill>
-              Explora la segmentación de imágenes paso a paso.
-            </Paragraph>
           </Box>
 
           <Box
@@ -86,20 +90,10 @@ export default function App() {
               onChange={selectCase}
             />
 
-            <Heading level={2} margin="none">
-              Caso {caseId}
-            </Heading>
-
-            <Text>
-              {cases.length} casos disponibles ·{' '}
-              {selectedCase.annotationPath
-                ? 'Anotación de referencia disponible'
-                : 'Sin anotación de referencia'}
-            </Text>
-
             <SegmentationWorkspace
               key={caseId}
               src={imageUrl}
+              annotationUrl={selectedCase.annotationPath ? `${import.meta.env.BASE_URL}${selectedCase.annotationPath}` : null}
               caseId={caseId}
               components={components}
               onComponentsChange={setComponents}

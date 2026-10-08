@@ -1,0 +1,40 @@
+.reference-section {
+  container-type: inline-size;
+}
+
+.reference-evaluation {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  align-items: stretch;
+}
+
+.reference-evaluation > * {
+  min-width: 0;
+}
+
+.reference-image-frame {
+  position: relative;
+  min-height: 0;
+}
+
+.reference-evaluation-image {
+  position: absolute;
+  display: block;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: left top;
+  border-radius: 4px;
+}
+
+@container (max-width: 40rem) {
+  .reference-evaluation {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reference-image-frame {
+    height: 160px;
+  }
+}

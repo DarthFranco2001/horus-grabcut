@@ -1,29 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
-import { Box, Button, RadioButtonGroup, Select, Text } from 'grommet'
+import { Box, Select, Text } from 'grommet'
 import { RoiEditor } from './RoiEditor'
-import { readGrayscaleImage, createMaskPreview } from '../browser/imageData'
-import { initializeLabels } from '../core/initialization'
-import type { InitialLabels } from '../core/initialization'
+import { ReferenceMetrics } from './ReferenceComparison'
+import { useGroundTruth } from '../hooks/useGroundTruth'
+import { readGrayscaleImage, createMaskPreview, createCutoutPreview } from '../browser/imageData'
 import type { GrayscaleImage } from '../core/image'
 import type { Roi } from '../core/roi'
-import { validateComponentCount } from '../core/gmm'
-import type { AppearanceResult } from '../core/gmm'
 import type { IterationResult } from '../core/grabcut'
-import type { SegmentationRequest } from '../workers/segmentation.types'
-import { MAX_ITERATIONS, startSegmentationJob } from '../browser/segmentationJob'
+import { MAX_ITERATIONS } from '../browser/segmentationJob'
+import { startGrabCutJob } from '../browser/grabcutJob'
+import './SegmentationWorkspace.css'
 
 interface SegmentationWorkspaceProps {
   src: string
   caseId: string
+  annotationUrl: string | null
   components: number
   onComponentsChange: (k: number) => void
   iterations: number
   onIterationsChange: (iterations: number) => void
-}
-
-interface Initialization {
-  result: InitialLabels
-  previewUrl: string
 }
 
 interface RunProgress {
@@ -35,17 +30,16 @@ interface RunProgress {
 const iterationOptions = Array.from({ length: MAX_ITERATIONS }, (_, i) => i + 1)
 const componentOptions = Array.from({ length: 10 }, (_, i) => i + 1)
 
-export function SegmentationWorkspace({ src, caseId, components, onComponentsChange, iterations, onIterationsChange }: SegmentationWorkspaceProps) {
+export function SegmentationWorkspace({ src, caseId, annotationUrl, components, onComponentsChange, iterations, onIterationsChange }: SegmentationWorkspaceProps) {
   const [roi, setRoi] = useState<Roi | null>(null)
   const [image, setImage] = useState<GrayscaleImage | null>(null)
-  const [initialization, setInitialization] = useState<Initialization | null>(null)
-  const [view, setView] = useState<'image' | 'mask'>('image')
+  const [view, setView] = useState<'image' | 'mask' | 'cutout'>('image')
   const [error, setError] = useState<string | null>(null)
-  const [appearance, setAppearance] = useState<AppearanceResult | null>(null)
-  const [segmentation, setSegmentation] = useState<(IterationResult & { previewUrl: string }) | null>(null)
-  const [busy, setBusy] = useState<'initialize' | 'iterate' | null>(null)
+  const [segmentation, setSegmentation] = useState<(IterationResult & { previewUrl: string; cutoutUrl: string }) | null>(null)
+  const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<RunProgress | null>(null)
-  const jobRef = useRef<ReturnType<typeof startSegmentationJob> | null>(null)
+  const { state: reference, retry: retryReference } = useGroundTruth(annotationUrl, image)
+  const jobRef = useRef<ReturnType<typeof startGrabCutJob> | null>(null)
 
   useEffect(() => () => {
     jobRef.current?.stop()
@@ -55,12 +49,11 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
   function stopJob() {
     jobRef.current?.stop()
     jobRef.current = null
-    setBusy(null)
+    setBusy(false)
   }
 
   function resetCalculation() {
     stopJob()
-    setAppearance(null)
     setSegmentation(null)
     setProgress(null)
   }
@@ -69,7 +62,6 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
     if (k === components) return
     resetCalculation()
     onComponentsChange(k)
-    setInitialization(null)
     setView('image')
     setError(null)
   }
@@ -79,14 +71,12 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
       && roi?.width === next?.width && roi?.height === next?.height) return
     resetCalculation()
     setRoi(next)
-    setInitialization(null)
     setView('image')
     setError(null)
   }
 
   function imageReady(element: HTMLImageElement) {
     resetCalculation()
-    setInitialization(null)
     setView('image')
     setError(null)
     try {
@@ -101,7 +91,6 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
     resetCalculation()
     setImage(null)
     setRoi(null)
-    setInitialization(null)
     setView('image')
     setError(null)
   }
@@ -111,37 +100,37 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
     setProgress((previous) => previous ? { ...previous, status: 'stopped' } : null)
   }
 
-  function runWorker(request: SegmentationRequest, total = 1) {
-    stopJob()
+  function restart() {
+    resetCalculation()
+    setView('image')
     setError(null)
-    setBusy(request.action)
-    setProgress(request.action === 'iterate' ? { completed: 0, total, status: 'running' } : null)
+  }
+
+  function segment() {
+    if (!image || !roi || busy) return
+    restart()
+    setBusy(true)
+    setProgress({ completed: 0, total: iterations, status: 'running' })
     try {
-      jobRef.current = startSegmentationJob(
+      jobRef.current = startGrabCutJob(
         () => new Worker(new URL('../workers/segmentation.worker.ts', import.meta.url), { type: 'module' }),
-        request,
-        total,
+        { image, roi, k: components, iterations },
         {
-          onResult(response, completed) {
-            if (response.action === 'initialize') setAppearance(response.result)
-            else if (request.action === 'iterate') {
-              const result = response.result
-              const previewUrl = createMaskPreview({ ...request.image, labels: result.labels })
-              setSegmentation({ ...result, previewUrl })
-              setAppearance(result.appearance)
-              setProgress({ completed, total, status: 'running' })
-              // Switch once; a user viewing the original can keep that view during later cuts.
-              if (completed === 1) setView('mask')
-            }
+          onResult(result, completed) {
+            const previewUrl = createMaskPreview({ ...image, labels: result.labels })
+            const cutoutUrl = createCutoutPreview(image, result.labels)
+            setSegmentation({ ...result, previewUrl, cutoutUrl })
+            setProgress({ completed, total: iterations, status: 'running' })
+            if (completed === 1) setView('cutout')
           },
           onComplete() {
             jobRef.current = null
-            setBusy(null)
+            setBusy(false)
             setProgress((previous) => previous ? { ...previous, status: 'complete' } : null)
           },
           onError(message) {
             jobRef.current = null
-            setBusy(null)
+            setBusy(false)
             setProgress((previous) => previous ? { ...previous, status: 'failed' } : null)
             setError(message)
           },
@@ -149,68 +138,45 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
       )
     } catch (cause) {
       stopJob()
-      setProgress((previous) => previous ? { ...previous, status: 'failed' } : null)
-      setError(cause instanceof Error ? cause.message : 'No se pudo iniciar el cálculo.')
+      setProgress(null)
+      setError(cause instanceof Error ? cause.message : 'No se pudo iniciar la segmentación.')
     }
   }
 
-  function initialize() {
-    if (!image || !roi || busy) return
-    resetCalculation()
-    try {
-      const result = initializeLabels(image, roi)
-      validateComponentCount(components, result.backgroundCount, result.foregroundCount)
-      const previewUrl = createMaskPreview(result)
-      setInitialization({ result, previewUrl })
-      setView('mask')
-      runWorker({ action: 'initialize', pixels: image.pixels, labels: result.labels, k: components })
-    } catch (cause) {
-      setInitialization(null)
-      setView('image')
-      setError(cause instanceof Error ? cause.message : 'No se pudo inicializar la máscara.')
-    }
-  }
-
-  function iterate(total = 1) {
-    if (!image || !roi || !initialization || !appearance || busy) return
-    runWorker({
-      action: 'iterate', image, roi, appearance,
-      labels: segmentation?.labels ?? initialization.result.labels,
-      completed: segmentation?.iteration ?? 0,
-    }, total)
-  }
-
+  const availableReference = reference.status === 'ready' ? reference.data : null
   const coversImage = !!(image && roi && roi.width === image.width && roi.height === image.height)
 
   return (
     <Box gap="small">
-      <Box direction="row" align="center" gap="small" wrap>
-        <label htmlFor="gmm-components">Gaussianas por clase (K)</label>
-        <Box width="xsmall">
-          <Select
-            id="gmm-components"
-            options={componentOptions}
-            value={components}
-            onChange={({ option }: { option: unknown }) => {
-              if (typeof option === 'number' && componentOptions.includes(option)) changeComponents(option)
-            }}
-          />
+      <Box direction="row" wrap style={{ gap: '12px 24px' }}>
+        <Box direction="row" align="center" gap="small" flex={false}>
+          <label htmlFor="gmm-components">Gaussianas (K)</label>
+          <Box width="xsmall">
+            <Select
+              id="gmm-components"
+              options={componentOptions}
+              value={components}
+              disabled={busy || segmentation !== null}
+              onChange={({ option }: { option: unknown }) => {
+                if (typeof option === 'number' && componentOptions.includes(option)) changeComponents(option)
+              }}
+            />
+          </Box>
         </Box>
-      </Box>
-      <Box direction="row" align="center" gap="small" wrap>
-        <label htmlFor="run-iterations">Máximo de iteraciones</label>
-        <Box width="xsmall">
-          <Select
-            id="run-iterations"
-            options={iterationOptions}
-            value={iterations}
-            disabled={busy !== null}
-            onChange={({ option }: { option: unknown }) => {
-              if (typeof option === 'number' && iterationOptions.includes(option)) onIterationsChange(option)
-            }}
-          />
+        <Box direction="row" align="center" gap="small" flex={false}>
+          <label htmlFor="run-iterations">Iteraciones</label>
+          <Box width="xsmall">
+            <Select
+              id="run-iterations"
+              options={iterationOptions}
+              value={iterations}
+              disabled={busy || segmentation !== null}
+              onChange={({ option }: { option: unknown }) => {
+                if (typeof option === 'number' && iterationOptions.includes(option)) onIterationsChange(option)
+              }}
+            />
+          </Box>
         </Box>
-        <Text size="small">Por ejecución; continúa desde la última máscara.</Text>
       </Box>
       <RoiEditor
         src={src}
@@ -219,80 +185,71 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
         onChange={changeRoi}
         onImageReady={imageReady}
         onImageError={imageFailed}
-        maskUrl={view === 'mask' ? (segmentation?.previewUrl ?? initialization?.previewUrl) : undefined}
+        readOnly={busy || segmentation !== null}
+        preview={view === 'cutout' && segmentation
+          ? { src: segmentation.cutoutUrl, kind: 'cutout' }
+          : view === 'mask' && segmentation
+            ? { src: segmentation.previewUrl, kind: 'mask' }
+            : undefined}
         actions={(
-          <>
-            <Button
-              label={busy === 'initialize' ? 'Inicializando…' : 'Inicializar'}
-              primary
-              disabled={!image || !roi || coversImage || busy !== null || appearance !== null}
-              onClick={initialize}
-            />
-            <Button
-              label="Ejecutar una iteración"
-              disabled={!appearance || busy !== null}
-              onClick={() => iterate()}
-            />
-            {busy === 'iterate' ? (
-              <Button label="Detener" onClick={stopExecution} />
+          <div className="workspace-toolbar" role="group" aria-label={busy ? 'Segmentación en curso' : segmentation ? 'Visualización' : 'Preparación'}>
+            {busy ? (
+              <button className="action-button" type="button" onClick={stopExecution}>Detener</button>
+            ) : segmentation ? (
+              <>
+                <button className="action-button" type="button" onClick={restart}>Reiniciar</button>
+                {([
+                  { value: 'image', label: 'Imagen' },
+                  { value: 'mask', label: 'Máscara' },
+                  { value: 'cutout', label: 'Recorte' },
+                ] as const).map(({ value, label }) => (
+                  <button
+                    key={value}
+                    className="action-button"
+                    type="button"
+                    aria-pressed={view === value}
+                    onClick={() => setView(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </>
             ) : (
-              <Button
-                label="Ejecutar"
-                primary={appearance !== null}
-                disabled={!appearance || busy !== null}
-                onClick={() => iterate(iterations)}
-              />
+              <>
+                <button className="action-button" type="button" disabled={!roi} onClick={() => changeRoi(null)}>Borrar ROI</button>
+                <button className="action-button" type="button" disabled={!image || !roi || coversImage} onClick={segment}>Segmentar</button>
+              </>
             )}
-            {initialization && (
-              <RadioButtonGroup
-                name="image-view"
-                aria-label="Vista de la imagen"
-                direction="row"
-                gap="small"
-                options={[
-                  { label: 'Imagen', value: 'image' },
-                  { label: segmentation ? 'Segmentación' : 'Máscara inicial', value: 'mask' },
-                ]}
-                value={view}
-                onChange={(event) => setView(event.target.value === 'mask' ? 'mask' : 'image')}
-              />
-            )}
-          </>
+          </div>
         )}
       />
-      {busy === 'initialize' && <Text role="status" size="small">Preparando modelos de apariencia…</Text>}
-      {progress && (
+      {reference.status === 'loading' && <Text role="status" size="small">Cargando referencia…</Text>}
+      {reference.status === 'absent' && <Text size="small">Este caso no tiene referencia. Puedes usar GrabCut sin comparación.</Text>}
+      {reference.status === 'error' && (
+        <Box gap="small" align="start">
+          <Text role="alert" size="small">{reference.message} Puedes seguir usando GrabCut.</Text>
+          <button className="action-button" type="button" onClick={retryReference}>Reintentar referencia</button>
+        </Box>
+      )}
+      {progress && progress.status !== 'complete' && (
         <Text role="status" size="small">
           {progress.status === 'running' && `Iteración ${Math.min(progress.completed + 1, progress.total)} de ${progress.total}…`}
-          {progress.status === 'complete' && `Ejecución completada: ${progress.completed} de ${progress.total} ${progress.total === 1 ? 'iteración' : 'iteraciones'}.`}
-          {progress.status === 'stopped' && `Ejecución detenida: ${progress.completed} de ${progress.total} ${progress.total === 1 ? 'iteración completada' : 'iteraciones completadas'}. Se conserva la última máscara terminada.`}
-          {progress.status === 'failed' && `Ejecución interrumpida: ${progress.completed} de ${progress.total} ${progress.total === 1 ? 'iteración completada' : 'iteraciones completadas'}. Se conserva la última máscara terminada.`}
+          {progress.status === 'stopped' && `Ejecución detenida: ${progress.completed} de ${progress.total} ${progress.total === 1 ? 'iteración completada' : 'iteraciones completadas'}. ${progress.completed > 0 ? 'Se conserva la última máscara terminada.' : ''}`}
+          {progress.status === 'failed' && `Ejecución interrumpida: ${progress.completed} de ${progress.total} ${progress.total === 1 ? 'iteración completada' : 'iteraciones completadas'}. ${progress.completed > 0 ? 'Se conserva la última máscara terminada.' : ''}`}
         </Text>
       )}
-      {appearance && !segmentation && !busy && <Text role="status" size="small">Modelos de apariencia preparados · K = {appearance.k}.</Text>}
       {error && <Text role="alert" color="status-critical">{error}</Text>}
-      {segmentation && (
-        <Box gap="xsmall">
-          <Text role="status">
-            Iteración {segmentation.iteration} · {segmentation.changed.toLocaleString('es-CR')} píxeles cambiaron
-            {' · '}Objeto: {segmentation.foregroundCount.toLocaleString('es-CR')} píxeles.
-          </Text>
-          <Text size="small">Blanco = objeto; negro = fondo. El exterior de la ROI permanece como fondo.</Text>
-          {segmentation.foregroundCount === 0 && <Text size="small">No quedó objeto en esta iteración. Prueba otra ROI o cambia K para reiniciar.</Text>}
-          {segmentation.changed === 0 && <Text size="small">La máscara no cambió en esta iteración.</Text>}
-        </Box>
+      {segmentation?.foregroundCount === 0 && (
+        <Text size="small">No quedó objeto. Pulsa Reiniciar y ajusta la ROI o K.</Text>
       )}
-      {initialization && !segmentation && (
-        <Box gap="xsmall">
-          <Text role="status">
-            Región candidata: {initialization.result.foregroundCount.toLocaleString('es-CR')} píxeles
-            {' · '}Fondo seguro: {initialization.result.backgroundCount.toLocaleString('es-CR')} píxeles
-          </Text>
-          <Text size="small">
-            Máscara inicial: blanco = región candidata; negro = fondo seguro.
-            La segmentación aún no se ha calculado.
-          </Text>
-        </Box>
+      {availableReference && annotationUrl && segmentation && roi && (
+        <ReferenceMetrics
+          reference={availableReference}
+          prediction={segmentation.labels}
+          roi={roi}
+          annotationUrl={annotationUrl}
+          caseId={caseId}
+        />
       )}
     </Box>
   )

@@ -1,4 +1,5 @@
 import { rgbaToGrayscale } from '../core/image'
+import { cutoutToRgba } from '../core/cutout'
 import type { GrayscaleImage } from '../core/image'
 import { labelsToRgba } from '../core/initialization'
 import type { ImageSize } from '../core/roi'
@@ -18,14 +19,22 @@ export function readGrayscaleImage(image: HTMLImageElement): GrayscaleImage {
   return rgbaToGrayscale(data, { width: canvas.width, height: canvas.height })
 }
 
-export function createMaskPreview(initialization: ImageSize & { labels: Uint8Array }): string {
+function createPreview(size: ImageSize, rgba: Uint8ClampedArray): string {
   const canvas = document.createElement('canvas')
-  canvas.width = initialization.width
-  canvas.height = initialization.height
+  canvas.width = size.width
+  canvas.height = size.height
   const context = canvas.getContext('2d')
-  if (!context) throw new Error('No se pudo dibujar la máscara.')
+  if (!context) throw new Error('No se pudo dibujar la vista previa.')
   const imageData = context.createImageData(canvas.width, canvas.height)
-  imageData.data.set(labelsToRgba(initialization.labels, initialization))
+  imageData.data.set(rgba)
   context.putImageData(imageData, 0, 0)
   return canvas.toDataURL('image/png')
+}
+
+export function createMaskPreview(initialization: ImageSize & { labels: Uint8Array }): string {
+  return createPreview(initialization, labelsToRgba(initialization.labels, initialization))
+}
+
+export function createCutoutPreview(image: GrayscaleImage, labels: Uint8Array): string {
+  return createPreview(image, cutoutToRgba(image, labels))
 }

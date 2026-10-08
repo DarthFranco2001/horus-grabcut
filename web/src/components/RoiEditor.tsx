@@ -1,6 +1,6 @@
-import { useId, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import type { PointerEvent, ReactNode } from 'react'
-import { Box, Button, Text } from 'grommet'
+import { Box, Text } from 'grommet'
 import { createRoi, imagePoint, moveRoi, resizeRoi } from '../core/roi'
 import type { Corner, ImageSize, Point, Roi } from '../core/roi'
 import './RoiEditor.css'
@@ -12,7 +12,8 @@ interface RoiEditorProps {
   onChange: (roi: Roi | null) => void
   onImageReady: (image: HTMLImageElement) => void
   onImageError: () => void
-  maskUrl?: string
+  preview?: { src: string; kind: 'mask' | 'cutout' }
+  readOnly?: boolean
   actions?: ReactNode
 }
 
@@ -25,14 +26,13 @@ type Gesture = {
   | { mode: 'resize'; original: Roi; corner: Corner }
 )
 
-export function RoiEditor({ src, caseId, roi, onChange, onImageReady, onImageError, maskUrl, actions }: RoiEditorProps) {
+export function RoiEditor({ src, caseId, roi, onChange, onImageReady, onImageError, preview, readOnly = false, actions }: RoiEditorProps) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [size, setSize] = useState<ImageSize | null>(null)
   // undefined means no active gesture; null means a draft without area yet.
   const [draft, setDraft] = useState<Roi | null | undefined>(undefined)
   const svgRef = useRef<SVGSVGElement>(null)
   const gestureRef = useRef<Gesture | null>(null)
-  const instructionsId = useId()
   const visibleRoi = draft === undefined ? roi : draft
 
   function pointAt(event: PointerEvent<SVGElement>): Point | null {
@@ -101,24 +101,18 @@ export function RoiEditor({ src, caseId, roi, onChange, onImageReady, onImageErr
 
   return (
     <Box gap="small">
-      <Text id={instructionsId} size="small">
-        {maskUrl
-          ? 'Selecciona Imagen para volver a editar la ROI.'
-          : 'Arrastra para dibujar una ROI; mueve su interior o ajusta sus esquinas. Dibuja fuera para reemplazarla.'}
-      </Text>
-
       <Box background="black" round="small" pad="small" align="center" aria-busy={status === 'loading'}>
         {status === 'loading' && <Text role="status" color="white">Cargando imagen…</Text>}
         {status === 'error' && <Text role="alert" color="white">No se pudo cargar la imagen del caso {caseId}.</Text>}
 
-        <div className="roi-stage" style={{ width: size?.width, display: status === 'error' ? 'none' : undefined }}>
+        <div className={`roi-stage${preview?.kind === 'cutout' ? ' roi-stage--cutout' : ''}`} style={{ width: size?.width, display: status === 'error' ? 'none' : undefined }}>
           <img
             className="roi-image"
             src={src}
             alt={`Resonancia magnética del caso ${caseId}`}
             draggable={false}
-            aria-hidden={!!maskUrl}
-            style={{ visibility: maskUrl ? 'hidden' : undefined }}
+            aria-hidden={!!preview}
+            style={{ visibility: preview ? 'hidden' : undefined }}
             onLoad={(event) => {
               setSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })
               setStatus('ready')
@@ -126,17 +120,21 @@ export function RoiEditor({ src, caseId, roi, onChange, onImageReady, onImageErr
             }}
             onError={() => { cancel(); setStatus('error'); onImageError() }}
           />
-          {maskUrl && (
-            <img className="roi-mask" src={maskUrl} alt={`Máscara del caso ${caseId}`} draggable={false} />
+          {preview && (
+            <img
+              className={`roi-preview roi-preview--${preview.kind}`}
+              src={preview.src}
+              alt={`${preview.kind === 'cutout' ? 'Recorte segmentado' : 'Máscara'} del caso ${caseId}`}
+              draggable={false}
+            />
           )}
-          {status === 'ready' && size && !maskUrl && (
+          {status === 'ready' && size && !readOnly && !preview && (
             <svg
               ref={svgRef}
               className="roi-overlay"
               viewBox={`0 0 ${size.width} ${size.height}`}
               role="group"
               aria-label={`Selección de ROI del caso ${caseId}`}
-              aria-describedby={instructionsId}
               onPointerDown={(event) => begin(event, 'draw')}
               onPointerMove={(event) => {
                 if (gestureRef.current?.pointerId === event.pointerId) setDraft(candidate(event))
@@ -169,17 +167,8 @@ export function RoiEditor({ src, caseId, roi, onChange, onImageReady, onImageErr
         </div>
       </Box>
 
-      <Box direction="row" gap="small" align="center" wrap>
-        <Button label="Borrar ROI" disabled={!roi} onClick={() => { cancel(); onChange(null) }} />
-        {actions}
-      </Box>
+      {actions}
 
-      <Text size="small">{size ? `Imagen original: ${size.width} × ${size.height} píxeles.` : 'Dimensiones pendientes.'}</Text>
-      <div className="roi-summary" role="status" aria-live="polite" aria-atomic="true">
-        {visibleRoi
-          ? `ROI: x=${visibleRoi.x}, y=${visibleRoi.y}, ancho=${visibleRoi.width}, alto=${visibleRoi.height} px`
-          : 'Sin ROI seleccionada.'}
-      </div>
       {visibleRoi && size && visibleRoi.width === size.width && visibleRoi.height === size.height && (
         <Text color="status-warning" size="small">La ROI ocupa toda la imagen. Deja algo de fondo fuera para inicializar GrabCut.</Text>
       )}
