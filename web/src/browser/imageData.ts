@@ -1,7 +1,7 @@
 import { rgbaToGrayscale } from '../core/image'
 import type { GrayscaleImage } from '../core/image'
 import { labelsToRgba } from '../core/initialization'
-import type { InitialLabels } from '../core/initialization'
+import type { ImageSize } from '../core/roi'
 
 export function readGrayscaleImage(image: HTMLImageElement): GrayscaleImage {
   if (!image.complete || image.naturalWidth === 0 || image.naturalHeight === 0) {
@@ -18,12 +18,12 @@ export function readGrayscaleImage(image: HTMLImageElement): GrayscaleImage {
   return rgbaToGrayscale(data, { width: canvas.width, height: canvas.height })
 }
 
-export function createMaskPreview(initialization: InitialLabels): string {
+export function createMaskPreview(initialization: ImageSize & { labels: Uint8Array }): string {
   const canvas = document.createElement('canvas')
   canvas.width = initialization.width
   canvas.height = initialization.height
   const context = canvas.getContext('2d')
-  if (!context) throw new Error('No se pudo dibujar la máscara inicial.')
+  if (!context) throw new Error('No se pudo dibujar la máscara.')
   const imageData = context.createImageData(canvas.width, canvas.height)
   imageData.data.set(labelsToRgba(initialization.labels, initialization))
   context.putImageData(imageData, 0, 0)

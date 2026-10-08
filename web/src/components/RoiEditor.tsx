@@ -127,7 +127,7 @@ export function RoiEditor({ src, caseId, roi, onChange, onImageReady, onImageErr
             onError={() => { cancel(); setStatus('error'); onImageError() }}
           />
           {maskUrl && (
-            <img className="roi-mask" src={maskUrl} alt={`Máscara inicial del caso ${caseId}`} draggable={false} />
+            <img className="roi-mask" src={maskUrl} alt={`Máscara del caso ${caseId}`} draggable={false} />
           )}
           {status === 'ready' && size && !maskUrl && (
             <svg

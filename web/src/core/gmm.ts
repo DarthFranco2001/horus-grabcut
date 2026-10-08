@@ -197,6 +197,19 @@ export function prepareAppearance(pixels: Uint8Array, labels: Uint8Array, k = DE
     background: updateGmm(samples.background, assignComponents(samples.background, initialModels.background), initialModels.background),
     foreground: updateGmm(samples.foreground, assignComponents(samples.foreground, initialModels.foreground), initialModels.foreground),
   }
+  return { k, initialModels, models, ...appearanceCosts(pixels, models) }
+}
+
+export function refineAppearance(pixels: Uint8Array, labels: Uint8Array, previous: AppearanceResult): AppearanceResult {
+  const samples = splitSamples(pixels, labels)
+  const models = {
+    background: updateGmm(samples.background, assignComponents(samples.background, previous.models.background), previous.models.background),
+    foreground: updateGmm(samples.foreground, assignComponents(samples.foreground, previous.models.foreground), previous.models.foreground),
+  }
+  return { k: previous.k, initialModels: previous.initialModels, models, ...appearanceCosts(pixels, models) }
+}
+
+function appearanceCosts(pixels: Uint8Array, models: AppearanceModels) {
   // There are only 256 possible intensities. Evaluate once per intensity, then map each pixel.
   const intensities = Uint8Array.from({ length: 256 }, (_, i) => i)
   const bgLookup = gmmCosts(intensities, models.background)
@@ -207,5 +220,5 @@ export function prepareAppearance(pixels: Uint8Array, labels: Uint8Array, k = DE
     backgroundCosts[i] = bgLookup[pixels[i]]
     foregroundCosts[i] = fgLookup[pixels[i]]
   }
-  return { k, initialModels, models, backgroundCosts, foregroundCosts }
+  return { backgroundCosts, foregroundCosts }
 }

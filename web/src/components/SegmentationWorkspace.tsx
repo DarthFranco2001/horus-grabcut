@@ -8,7 +8,8 @@ import type { GrayscaleImage } from '../core/image'
 import type { Roi } from '../core/roi'
 import { validateComponentCount } from '../core/gmm'
 import type { AppearanceResult } from '../core/gmm'
-import type { AppearanceResponse } from '../workers/appearance.types'
+import type { IterationResult } from '../core/grabcut'
+import type { SegmentationRequest, SegmentationResponse } from '../workers/segmentation.types'
 
 interface SegmentationWorkspaceProps {
   src: string
@@ -31,7 +32,8 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
   const [view, setView] = useState<'image' | 'mask'>('image')
   const [error, setError] = useState<string | null>(null)
   const [appearance, setAppearance] = useState<AppearanceResult | null>(null)
-  const [preparing, setPreparing] = useState(false)
+  const [segmentation, setSegmentation] = useState<(IterationResult & { previewUrl: string }) | null>(null)
+  const [busy, setBusy] = useState<'initialize' | 'iterate' | null>(null)
   const workerRef = useRef<Worker | null>(null)
 
   useEffect(() => () => {
@@ -39,16 +41,21 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
     workerRef.current = null
   }, [])
 
-  function cancelAppearance() {
+  function stopWorker() {
     workerRef.current?.terminate()
     workerRef.current = null
-    setPreparing(false)
+    setBusy(null)
+  }
+
+  function resetCalculation() {
+    stopWorker()
     setAppearance(null)
+    setSegmentation(null)
   }
 
   function changeComponents(k: number) {
     if (k === components) return
-    cancelAppearance()
+    resetCalculation()
     onComponentsChange(k)
     setInitialization(null)
     setView('image')
@@ -59,7 +66,7 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
   function changeRoi(next: Roi | null) {
     if (roi?.x === next?.x && roi?.y === next?.y
       && roi?.width === next?.width && roi?.height === next?.height) return
-    cancelAppearance()
+    resetCalculation()
     setRoi(next)
     setInitialization(null)
     setView('image')
@@ -67,7 +74,7 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
   }
 
   function imageReady(element: HTMLImageElement) {
-    cancelAppearance()
+    resetCalculation()
     setInitialization(null)
     setView('image')
     setError(null)
@@ -80,7 +87,7 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
   }
 
   function imageFailed() {
-    cancelAppearance()
+    resetCalculation()
     setImage(null)
     setRoi(null)
     setInitialization(null)
@@ -88,49 +95,74 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
     setError(null)
   }
 
+  function runWorker(request: SegmentationRequest) {
+    stopWorker()
+    setError(null)
+    setBusy(request.action)
+    try {
+      const worker = new Worker(new URL('../workers/segmentation.worker.ts', import.meta.url), { type: 'module' })
+      workerRef.current = worker
+      worker.onmessage = (event: MessageEvent<SegmentationResponse>) => {
+        // Ignore any message queued by a calculation invalidated by a new ROI/K/case.
+        if (workerRef.current !== worker) return
+        stopWorker()
+        const response = event.data
+        if (!response.ok) { setError(response.error); return }
+        try {
+          if (response.action === 'initialize') setAppearance(response.result)
+          else if (request.action === 'iterate') {
+            const result = response.result
+            const previewUrl = createMaskPreview({ ...request.image, labels: result.labels })
+            setSegmentation({ ...result, previewUrl })
+            setAppearance(result.appearance)
+            setView('mask')
+          }
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : 'No se pudo mostrar el resultado.')
+        }
+      }
+      worker.onerror = () => {
+        if (workerRef.current !== worker) return
+        stopWorker()
+        setError('No se pudo completar el cálculo. Puedes volver a intentarlo.')
+      }
+      worker.onmessageerror = () => {
+        if (workerRef.current !== worker) return
+        stopWorker()
+        setError('No se pudo recibir el resultado. Puedes volver a intentarlo.')
+      }
+      // Structured cloning preserves the current image, labels and models for retry/cancellation.
+      worker.postMessage(request)
+    } catch (cause) {
+      stopWorker()
+      setError(cause instanceof Error ? cause.message : 'No se pudo iniciar el cálculo.')
+    }
+  }
+
   function initialize() {
-    if (!image || !roi) return
-    cancelAppearance()
+    if (!image || !roi || busy) return
+    resetCalculation()
     try {
       const result = initializeLabels(image, roi)
       validateComponentCount(components, result.backgroundCount, result.foregroundCount)
       const previewUrl = createMaskPreview(result)
       setInitialization({ result, previewUrl })
       setView('mask')
-      setError(null)
-      setPreparing(true)
-
-      const worker = new Worker(new URL('../workers/appearance.worker.ts', import.meta.url), { type: 'module' })
-      workerRef.current = worker
-      worker.onmessage = (event: MessageEvent<AppearanceResponse>) => {
-        // Ignore any message queued by a calculation invalidated by a new ROI/K/case.
-        if (workerRef.current !== worker) return
-        worker.terminate()
-        workerRef.current = null
-        setPreparing(false)
-        if (event.data.ok) setAppearance(event.data.result)
-        else setError(event.data.error)
-      }
-      worker.onerror = () => {
-        if (workerRef.current !== worker) return
-        cancelAppearance()
-        setError('No se pudieron preparar los modelos. Vuelve a inicializar.')
-      }
-      worker.onmessageerror = () => {
-        if (workerRef.current !== worker) return
-        cancelAppearance()
-        setError('No se pudo recibir el resultado. Vuelve a inicializar.')
-      }
-      // Transfer copies so the current image and initial labels stay available in the UI.
-      const pixels = image.pixels.slice()
-      const labels = result.labels.slice()
-      worker.postMessage({ pixels, labels, k: components }, [pixels.buffer, labels.buffer])
+      runWorker({ action: 'initialize', pixels: image.pixels, labels: result.labels, k: components })
     } catch (cause) {
-      cancelAppearance()
       setInitialization(null)
       setView('image')
       setError(cause instanceof Error ? cause.message : 'No se pudo inicializar la máscara.')
     }
+  }
+
+  function iterate() {
+    if (!image || !roi || !initialization || !appearance || busy) return
+    runWorker({
+      action: 'iterate', image, roi, appearance,
+      labels: segmentation?.labels ?? initialization.result.labels,
+      completed: segmentation?.iteration ?? 0,
+    })
   }
 
   const coversImage = !!(image && roi && roi.width === image.width && roi.height === image.height)
@@ -157,14 +189,20 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
         onChange={changeRoi}
         onImageReady={imageReady}
         onImageError={imageFailed}
-        maskUrl={view === 'mask' ? initialization?.previewUrl : undefined}
+        maskUrl={view === 'mask' ? (segmentation?.previewUrl ?? initialization?.previewUrl) : undefined}
         actions={(
           <>
             <Button
-              label={preparing ? 'Inicializando…' : 'Inicializar'}
+              label={busy === 'initialize' ? 'Inicializando…' : 'Inicializar'}
               primary
-              disabled={!image || !roi || coversImage || preparing || appearance !== null}
+              disabled={!image || !roi || coversImage || busy !== null || appearance !== null}
               onClick={initialize}
+            />
+            <Button
+              label={busy === 'iterate' ? 'Calculando…' : 'Ejecutar una iteración'}
+              primary={appearance !== null}
+              disabled={!appearance || busy !== null}
+              onClick={iterate}
             />
             {initialization && (
               <RadioButtonGroup
@@ -174,7 +212,7 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
                 gap="small"
                 options={[
                   { label: 'Imagen', value: 'image' },
-                  { label: 'Máscara inicial', value: 'mask' },
+                  { label: segmentation ? 'Segmentación' : 'Máscara inicial', value: 'mask' },
                 ]}
                 value={view}
                 onChange={(event) => setView(event.target.value === 'mask' ? 'mask' : 'image')}
@@ -183,10 +221,21 @@ export function SegmentationWorkspace({ src, caseId, components, onComponentsCha
           </>
         )}
       />
-      {preparing && <Text role="status" size="small">Preparando modelos de apariencia…</Text>}
-      {appearance && <Text role="status" size="small">Modelos de apariencia preparados · K = {appearance.k}.</Text>}
+      {busy && <Text role="status" size="small">{busy === 'initialize' ? 'Preparando modelos de apariencia…' : 'Calculando el corte mínimo…'}</Text>}
+      {appearance && !segmentation && !busy && <Text role="status" size="small">Modelos de apariencia preparados · K = {appearance.k}.</Text>}
       {error && <Text role="alert" color="status-critical">{error}</Text>}
-      {initialization && (
+      {segmentation && (
+        <Box gap="xsmall">
+          <Text role="status">
+            Iteración {segmentation.iteration} · {segmentation.changed.toLocaleString('es-CR')} píxeles cambiaron
+            {' · '}Objeto: {segmentation.foregroundCount.toLocaleString('es-CR')} píxeles.
+          </Text>
+          <Text size="small">Blanco = objeto; negro = fondo. El exterior de la ROI permanece como fondo.</Text>
+          {segmentation.foregroundCount === 0 && <Text size="small">No quedó objeto en esta iteración. Prueba otra ROI o cambia K para reiniciar.</Text>}
+          {segmentation.changed === 0 && <Text size="small">La máscara no cambió en esta iteración.</Text>}
+        </Box>
+      )}
+      {initialization && !segmentation && (
         <Box gap="xsmall">
           <Text role="status">
             Región candidata: {initialization.result.foregroundCount.toLocaleString('es-CR')} píxeles

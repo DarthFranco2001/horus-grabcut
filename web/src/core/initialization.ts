@@ -39,7 +39,7 @@ export function labelsToRgba(labels: Uint8Array, size: ImageSize): Uint8ClampedA
   if (labels.length !== pixelCount(size)) throw new Error('La máscara no coincide con las dimensiones de la imagen.')
   const rgba = new Uint8ClampedArray(labels.length * 4)
   for (let i = 0; i < labels.length; i++) {
-    if (labels[i] !== 0 && labels[i] !== 1) throw new Error('La máscara inicial solo admite etiquetas 0 y 1.')
+    if (labels[i] !== 0 && labels[i] !== 1) throw new Error('La máscara solo admite etiquetas 0 y 1.')
     const value = labels[i] * 255
     rgba[i * 4] = value
     rgba[i * 4 + 1] = value

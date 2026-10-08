@@ -4,9 +4,9 @@ Interfaz con React, TypeScript, Grommet y Vite para el proyecto Horus GrabCut.
 La aplicación permite elegir entre los casos de `../data/images/`, con
 `VS-SEG-018` como selección inicial si está disponible. El visor indica los
 estados de carga y error y permite dibujar, mover y redimensionar una ROI.
-La lectura de intensidades, la máscara inicial y los modelos gaussianos de
-apariencia están implementados. El término espacial y el corte mínimo todavía
-no están implementados.
+La aplicación permite inicializar los modelos gaussianos y ejecutar GrabCut
+una iteración a la vez, con vecindad de ocho píxeles y corte mínimo. Todo el
+cálculo ocurre en el navegador; no necesita un servidor de procesamiento.
 
 ## Desarrollo local
 
@@ -79,7 +79,10 @@ ejecuta `npm run catalog` o reinicia `npm run dev`.
 - `src/core/image.ts`: conversión RGBA a intensidades de 8 bits.
 - `src/core/initialization.ts`: etiquetas iniciales y representación binaria.
 - `src/core/gmm.ts`: mezclas gaussianas, asignación, reajuste y costos de apariencia.
-- `src/workers/appearance.worker.ts`: cálculo de apariencia fuera del hilo de la interfaz.
+- `src/core/spatial.ts`: vecindad, beta y penalizaciones en la frontera de la ROI.
+- `src/core/mincut.ts`: grafo residual y flujo máximo de Dinic sin recursión.
+- `src/core/grabcut.ts`: una iteración de reajuste y corte.
+- `src/workers/segmentation.worker.ts`: inicialización e iteraciones fuera del hilo de la interfaz.
 - `src/browser/imageData.ts`: lectura Canvas y vista previa de la máscara.
 - `tests/initialization.test.mjs`: intensidades, límites, etiquetas y conteos.
 - `tests/roi.test.mjs`: pruebas de geometría con el runner integrado de Node.
@@ -136,8 +139,8 @@ reduce K silenciosamente cuando una selección es demasiado pequeña.
 
 **Inicializar** prepara la máscara y, en un Web Worker, los GMM de fondo y región
 candidata. La interfaz confirma cuando los modelos están preparados. Las
-anotaciones de referencia no participan. El cálculo todavía no refina la máscara:
-el rectángulo inicial permanece hasta implementar el corte mínimo.
+anotaciones de referencia no participan. La máscara permanece rectangular hasta
+pulsar **Ejecutar una iteración**.
 
 El portado reproduce `grabcut2.ipynb`: grupos de intensidades ordenadas con la
 misma distribución de tamaños que `np.array_split`, varianza poblacional más
@@ -149,8 +152,9 @@ Los costos pueden ser negativos y no se truncan.
 
 Las intensidades son de 8 bits: los costos se calculan para las 256 intensidades
 y se asignan después a cada píxel. Se usan `Float64Array` para los parámetros y
-costos. El worker recibe copias transferibles de píxeles y etiquetas; no vacía
-los arreglos de la interfaz. Cambiar ROI, K o caso cancela el trabajo anterior,
+costos. Los datos de entrada se clonan al enviar al worker y los resultados
+se devuelven como arreglos transferibles; los datos de la interfaz permanecen
+disponibles para reintentar si falla un cálculo. Cambiar ROI, K o caso cancela el trabajo anterior,
 y los mensajes obsoletos no pueden reemplazar los resultados actuales.
 
 ## Referencias numéricas de Python
@@ -173,3 +177,60 @@ npm test
 
 El generador extrae únicamente las cuatro funciones numéricas del cuaderno;
 no ejecuta sus celdas de interfaz ni modifica imágenes, anotaciones o notebooks.
+
+## Una iteración de GrabCut
+
+Tras inicializar, pulsa **Ejecutar una iteración**. La vista **Segmentación**
+muestra el objeto en blanco y el fondo en negro, junto con el número de
+iteración, los píxeles que cambiaron y el tamaño del objeto. Puedes repetir el
+botón para avanzar manualmente. **Imagen** permite volver al original y editar
+la ROI; modificarla, borrarla o cambiar K descarta todas las iteraciones.
+Cambiar de caso también cancela el worker y reinicia el resultado.
+
+La primera iteración utiliza los costos preparados por **Inicializar**, sin
+repetir la primera asignación y actualización de GMM. Las siguientes reasignan
+componentes y reajustan los modelos con la última máscara antes de cortar.
+Una clase vacía conserva su modelo anterior, igual que el cuaderno. La interfaz
+avisa cuando no queda objeto o cuando una iteración no cambia la máscara;
+esto último no se presenta como una garantía de convergencia de los modelos.
+
+El término espacial reproduce `grabcut2.ipynb`: ocho vecinos, cada par una sola
+vez, distancias 1 y √2, beta calculado sobre los pares de **toda la imagen** y
+pesos `gamma * exp(-beta * diferencia²) / distancia`. Gamma queda fijo en 10,
+el valor que selecciona el cuaderno tras su comparación. Una imagen uniforme
+usa beta = 0. No se utilizan las anotaciones de referencia.
+
+Solo los píxeles dentro de la ROI son nodos variables. Los vecinos externos
+permanecen como fondo: sus enlaces suman una penalización al costo de objeto
+del nodo interior. El corte usa Dinic con arreglos tipados y pila explícita,
+sin recursión. Se resta el mínimo de cada par de costos para obtener capacidades
+no negativas, conservando esa constante al calcular la energía del resultado.
+La tolerancia residual es `1e-10`, como en Python. El lado de la fuente es objeto.
+
+Los diagnósticos numéricos comparan energía antes y después del corte con los
+**mismos modelos**, y omiten el término constante de apariencia exterior, como
+el cuaderno. No debe interpretarse una comparación entre iteraciones como si
+los modelos fueran fijos. La UI mantiene únicamente máscara y conteos; la
+energía y beta quedan disponibles en el resultado del núcleo para las pruebas.
+
+Las pruebas comprueban orientación de terminales, costos negativos, empates,
+vecindad, fronteras, imágenes uniformes y clases vacías. Enumeran todas las
+etiquetas de 120 grafos pequeños para verificar el óptimo global y prueban una
+cadena de 20.000 nodos para detectar dependencias de la pila de llamadas.
+`tests/fixtures/grabcut-python.json` contiene tres iteraciones de los casos
+001, 017 y 018 con K = 5, además de K = 1 y 8 en el caso 017. Las máscaras deben
+coincidir píxel a píxel y las energías usan tolerancia absoluta `1e-7` más
+relativa `1e-9`. Los PNG originales se leen en las pruebas y sus intensidades
+se verifican mediante hashes generados con OpenCV, sin duplicar las imágenes.
+
+Para regenerar las referencias del corte:
+
+```bash
+../.venv/bin/python scripts/generate-grabcut-fixtures.py
+npm test
+```
+
+El generador extrae las funciones numéricas y los bloques espaciales del
+cuaderno sin ejecutar su interfaz. Las pruebas habituales solo necesitan Node.
+No se han añadido dependencias. La ejecución automática de varias iteraciones,
+la evaluación contra anotaciones y la exportación quedan para pasos posteriores.
