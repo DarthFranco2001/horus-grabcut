@@ -5,6 +5,7 @@ import type { ThemeType } from 'grommet'
 import { CaseSelector } from './components/CaseSelector'
 import { SegmentationWorkspace } from './components/SegmentationWorkspace'
 import { cases } from './data/cases'
+import { DEFAULT_COMPONENTS } from './core/gmm'
 
 const theme: ThemeType = {
   global: {
@@ -30,6 +31,7 @@ const initialCaseId =
 
 export default function App() {
   const [caseId, setCaseId] = useState(initialCaseId)
+  const [components, setComponents] = useState(DEFAULT_COMPONENTS)
 
   function selectCase(nextCaseId: string) {
     if (nextCaseId === caseId) return
@@ -97,6 +99,8 @@ export default function App() {
               key={caseId}
               src={imageUrl}
               caseId={caseId}
+              components={components}
+              onComponentsChange={setComponents}
             />
           </Box>
         </Box>

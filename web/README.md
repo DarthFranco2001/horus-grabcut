@@ -4,8 +4,9 @@ Interfaz con React, TypeScript, Grommet y Vite para el proyecto Horus GrabCut.
 La aplicación permite elegir entre los casos de `../data/images/`, con
 `VS-SEG-018` como selección inicial si está disponible. El visor indica los
 estados de carga y error y permite dibujar, mover y redimensionar una ROI.
-La lectura de intensidades y la máscara inicial están implementadas.
-Los modelos gaussianos y el corte mínimo todavía no están implementados.
+La lectura de intensidades, la máscara inicial y los modelos gaussianos de
+apariencia están implementados. El término espacial y el corte mínimo todavía
+no están implementados.
 
 ## Desarrollo local
 
@@ -71,12 +72,14 @@ ejecuta `npm run catalog` o reinicia `npm run dev`.
 
 - `src/main.tsx`: monta React y mantiene `StrictMode` para desarrollo.
 - `src/App.tsx`: caso seleccionado, composición de la pantalla y tema.
-- `src/components/SegmentationWorkspace.tsx`: ROI, píxeles, inicialización y vista del caso activo.
+- `src/components/SegmentationWorkspace.tsx`: ROI, píxeles, inicialización y ciclo de vida del worker.
 - `src/components/CaseSelector.tsx`: selector controlado de casos.
 - `src/components/RoiEditor.tsx`: imagen, selección de ROI y estados de carga/error.
 - `src/core/roi.ts`: coordenadas, límites, movimiento y ajuste de la ROI.
 - `src/core/image.ts`: conversión RGBA a intensidades de 8 bits.
 - `src/core/initialization.ts`: etiquetas iniciales y representación binaria.
+- `src/core/gmm.ts`: mezclas gaussianas, asignación, reajuste y costos de apariencia.
+- `src/workers/appearance.worker.ts`: cálculo de apariencia fuera del hilo de la interfaz.
 - `src/browser/imageData.ts`: lectura Canvas y vista previa de la máscara.
 - `tests/initialization.test.mjs`: intensidades, límites, etiquetas y conteos.
 - `tests/roi.test.mjs`: pruebas de geometría con el runner integrado de Node.
@@ -122,3 +125,51 @@ Cambiar o borrar la ROI descarta la inicialización y vuelve a la imagen.
 Cambiar de caso reinicia todo el estado mediante un componente con `key`.
 La ROI debe dejar al menos un píxel de fondo fuera: una selección que cubra
 toda la imagen no permite inicializar. Las anotaciones no intervienen.
+
+## Modelos gaussianos y K
+
+El selector **Gaussianas por clase (K)** permite elegir entre 1 y 10 componentes,
+con 5 como valor inicial. K se conserva al cambiar de imagen. Cambiar K descarta
+la inicialización y los modelos anteriores, conserva la ROI y requiere pulsar
+**Inicializar** otra vez. Cada clase debe contener al menos K píxeles; no se
+reduce K silenciosamente cuando una selección es demasiado pequeña.
+
+**Inicializar** prepara la máscara y, en un Web Worker, los GMM de fondo y región
+candidata. La interfaz confirma cuando los modelos están preparados. Las
+anotaciones de referencia no participan. El cálculo todavía no refina la máscara:
+el rectángulo inicial permanece hasta implementar el corte mínimo.
+
+El portado reproduce `grabcut2.ipynb`: grupos de intensidades ordenadas con la
+misma distribución de tamaños que `np.array_split`, varianza poblacional más
+`1e-6`, asignación dura ponderada, una actualización y costo marginal mediante
+log-sum-exp estable. Se conservan los parámetros de componentes vacíos con peso
+cero; una clase vacía durante un reajuste conserva una copia del modelo anterior.
+Los empates de asignación favorecen al primer componente, como `argmin` de NumPy.
+Los costos pueden ser negativos y no se truncan.
+
+Las intensidades son de 8 bits: los costos se calculan para las 256 intensidades
+y se asignan después a cada píxel. Se usan `Float64Array` para los parámetros y
+costos. El worker recibe copias transferibles de píxeles y etiquetas; no vacía
+los arreglos de la interfaz. Cambiar ROI, K o caso cancela el trabajo anterior,
+y los mensajes obsoletos no pueden reemplazar los resultados actuales.
+
+## Referencias numéricas de Python
+
+`npm test` incluye referencias de tres imágenes del repositorio para K = 1, 3,
+5 y 8. Compara pesos, medias, varianzas, asignaciones y costos en las 256
+intensidades. Las asignaciones deben coincidir exactamente; los valores de punto
+flotante usan tolerancia absoluta `1e-8` más relativa `1e-10`.
+
+Los resultados están en `tests/fixtures/gmm-python.json`, junto con hashes de
+las imágenes y del cuaderno utilizado. Los histogramas conservan las muestras
+sin duplicar los PNG. Las pruebas habituales no necesitan Python ni OpenCV.
+Para regenerar las referencias desde `web/`, con el entorno Python del
+repositorio ya preparado:
+
+```bash
+../.venv/bin/python scripts/generate-gmm-fixtures.py
+npm test
+```
+
+El generador extrae únicamente las cuatro funciones numéricas del cuaderno;
+no ejecuta sus celdas de interfaz ni modifica imágenes, anotaciones o notebooks.
