@@ -1,0 +1,256 @@
+% !TeX root = main.tex
+\section{Metodología}
+\label{sec:metodologia}
+
+\subsection{Imagen de entrada e inicialización}
+
+Se emplea una implementación de segmentación interactiva basada en GrabCut
+para imágenes bidimensionales en escala de grises. El procedimiento alterna
+la estimación de modelos de intensidad para el fondo y el primer plano con
+la actualización de etiquetas mediante cortes de grafos. La descripción
+siguiente corresponde a la implementación del cuaderno del
+proyecto~\cite{cuaderno}, basada en los principios de GrabCut~\cite{rother2004}.
+OpenCV se utiliza para leer las imágenes y transformar sus canales; la
+segmentación se calcula mediante las funciones del cuaderno y no mediante
+una llamada a \texttt{cv2.grabCut}.
+
+Sea $\Omega$ el conjunto de píxeles de la imagen y $x_i\in[0,255]$ la
+intensidad del píxel $i$. La imagen PNG se carga en escala de grises y las
+intensidades se convierten a precisión doble para los cálculos. No se aplica
+una normalización adicional, filtrado ni cambio de tamaño en el procedimiento
+del cuaderno. La unidad de procesamiento es un corte; cada ejecución
+selecciona un caso mediante su identificador.
+
+La interacción consiste en delimitar sobre la imagen un rectángulo $R$
+que contenga la lesión y un margen de tejido circundante, conforme al
+esquema de inicialización rectangular de GrabCut~\cite{rother2004}. Sus coordenadas
+se expresan en píxeles enteros. Se inicializan las etiquetas como
+\begin{equation}
+ \alpha_i^{(0)}=[i\in R],
+ \label{eq:inicializacion}
+\end{equation}
+donde los corchetes valen uno cuando se cumple la condición y cero en caso
+contrario. Las etiquetas pertenecen a $\{0,1\}$. La etiqueta cero representa fondo y la etiqueta uno, primer
+plano. Durante toda la optimización se impone $\alpha_i=0$ para
+$i\notin R$. Las etiquetas interiores pueden cambiar. Por tanto, el
+rectángulo define el dominio de búsqueda y no la segmentación final. La
+inicialización requiere muestras suficientes dentro y fuera del rectángulo
+para formar los cinco grupos de cada modelo.
+
+\subsection{Modelos de intensidad}
+
+Para cada clase $a\in\{0,1\}$ se modela la intensidad mediante una mezcla
+de $K=5$ distribuciones gaussianas unidimensionales. Esta es una
+adaptación escalar del modelo de apariencia de GrabCut~\cite{rother2004}:
+\begin{equation}
+ p(x_i\mid a;\theta)=\sum_{k=1}^{K}w_{ak}
+ \mathcal{N}(x_i;\mu_{ak},\sigma_{ak}^{2}),
+ \label{eq:mezcla}
+\end{equation}
+donde $\theta$ reúne los pesos $w_{ak}$, las medias $\mu_{ak}$ y las
+varianzas $\sigma_{ak}^{2}$. Los pesos de cada clase satisfacen
+\begin{equation}
+ \sum_{k=1}^{K}w_{ak}=1.
+ \label{eq:normalizacion-pesos}
+\end{equation}
+En la implementación del cuaderno~\cite{cuaderno}, la inicialización
+ordena las intensidades de
+cada clase y las divide en cinco grupos de tamaño aproximadamente igual.
+El peso inicial de cada componente es la fracción de muestras de su grupo.
+Su media y varianza se calculan a partir de esas muestras, añadiendo
+$\varepsilon=10^{-6}$ a la varianza.
+
+En cada iteración, cada píxel se asigna al componente de mayor contribución
+ponderada dentro de su clase actual, siguiendo el esquema de asignación
+única de componentes~\cite{rother2004}. De forma equivalente,
+\begin{equation}
+ k_i=\operatorname*{arg\,min}_{k}d_{\alpha_i k}(x_i),
+\end{equation}
+donde el costo de cada componente es
+\begin{equation}
+ d_{ak}(x_i)=-\log w_{ak}+\tfrac12\log(2\pi\sigma_{ak}^{2})
+ +\frac{(x_i-\mu_{ak})^2}{2\sigma_{ak}^{2}}.
+\end{equation}
+El logaritmo es natural. Los componentes de peso cero tienen costo infinito.
+La asignación es única y no modifica todavía la clase del píxel.
+
+Sean $X_{ak}$ las muestras asignadas al componente $k$ de la clase $a$,
+$N_{ak}=|X_{ak}|$ y $N_a=\sum_k N_{ak}$. Los parámetros se actualizan como
+\begin{equation}
+ w_{ak}=\frac{N_{ak}}{N_a},
+ \label{eq:actualizacion-pesos}
+\end{equation}
+\begin{equation}
+ \mu_{ak}=\frac{1}{N_{ak}}\sum_{x_i\in X_{ak}}x_i,
+ \label{eq:actualizacion-medias}
+\end{equation}
+\begin{equation}
+ \sigma_{ak}^{2}=\frac{1}{N_{ak}}\sum_{x_i\in X_{ak}}(x_i-\mu_{ak})^2
+ +\varepsilon.
+ \label{eq:actualizacion-modelos}
+\end{equation}
+Un componente sin muestras recibe peso cero y conserva su media y varianza
+anteriores. Si una clase queda vacía, se conservan todos sus parámetros.
+El costo de asignar el píxel a una clase se calcula con la mezcla
+completa~\cite{cuaderno}:
+\begin{equation}
+ D_i(a;\theta)=-\log p(x_i\mid a;\theta).
+ \label{eq:costo-apariencia}
+\end{equation}
+La suma se evalúa en el dominio logarítmico para reducir problemas de
+precisión numérica. Esta elección difiere de la energía con componentes
+explícitos del artículo original~\cite{rother2004}: la
+asignación de componentes se utiliza para ajustar los parámetros, pero el
+costo del corte marginaliza sobre todos los componentes.
+
+\subsection{Energía y coherencia espacial}
+
+La segmentación combina el costo de intensidad con una penalización por
+asignar etiquetas diferentes a píxeles vecinos, siguiendo la formulación
+de segmentación por grafos~\cite{boykov2001,rother2004}:
+\begin{equation}
+ E(\alpha;\theta)=\sum_{i\in\Omega}D_i(\alpha_i;\theta)
+ +\sum_{\{i,j\}\in\mathcal{N}}v_{ij}[\alpha_i\ne\alpha_j].
+ \label{eq:energia-segmentacion}
+\end{equation}
+El conjunto $\mathcal{N}$ contiene los pares de una vecindad de ocho
+vecinos, contando cada par una sola vez. Se emplean los pesos espaciales
+y la estimación de contraste descritos para imágenes escalares
+en~\cite{rother2004}:
+\begin{equation}
+ v_{ij}=\frac{\gamma}{d_{ij}}\exp[-\beta(x_i-x_j)^2],
+ \label{eq:pesos-espaciales}
+\end{equation}
+donde
+\begin{equation}
+ \beta=\left(\frac{2}{|\mathcal{N}|}
+ \sum_{\{i,j\}\in\mathcal{N}}(x_i-x_j)^2\right)^{-1},
+ \label{eq:contraste-espacial}
+\end{equation}
+con $\gamma=10$, valor fijado en el cuaderno~\cite{cuaderno}. Este valor
+es una elección de la implementación y no el ajuste $\gamma=50$
+reportado en el artículo original~\cite{rother2004}. La distancia $d_{ij}$ vale uno para vecinos horizontales
+y verticales, y $\sqrt{2}$ para diagonales, en unidades de píxel. El
+parámetro $\beta$ se estima sobre toda la imagen; si todas las diferencias
+son nulas, se fija en cero. Los pesos elevados penalizan separar píxeles
+de intensidad similar, mientras que las diferencias grandes reducen la
+penalización. Estos pesos permanecen fijos durante las iteraciones.
+
+\subsection{Construcción del grafo y corte mínimo}
+
+La representación mediante terminales y enlaces entre vecinos sigue el
+principio de los cortes de grafos para segmentación~\cite{boykov2001}.
+En el cuaderno, el grafo incluye únicamente los píxeles de $R$ como nodos
+variables~\cite{cuaderno}. El
+efecto de los vecinos exteriores, fijados como fondo, se incorpora al costo
+de primer plano mediante
+\begin{equation}
+ q_i=\sum_{\substack{j\notin R\\\{i,j\}\in\mathcal{N}}}v_{ij},
+\end{equation}
+\begin{equation}
+ \widetilde D_i(a;\theta)=D_i(a;\theta)+a q_i.
+\end{equation}
+Así, la energía que depende de las etiquetas interiores es
+\begin{equation}
+ E_R(\alpha;\theta)=\sum_{i\in R}\widetilde D_i(\alpha_i;\theta)
+ +\sum_{\substack{\{i,j\}\in\mathcal{N}\\i,j\in R}}
+ v_{ij}[\alpha_i\ne\alpha_j].
+ \label{eq:energia-reducida}
+\end{equation}
+Para modelos fijos, la diferencia entre $E$ y $E_R$ es el costo constante
+$\sum_{i\notin R}D_i(0;\theta)$ y no cambia el corte óptimo.
+
+Se añaden una fuente $s$, asociada al primer plano, y un sumidero $t$,
+asociado al fondo. Para obtener capacidades no negativas, se resta de ambos
+costos de cada píxel el valor
+$m_i=\min\{\widetilde D_i(0;\theta),\widetilde D_i(1;\theta)\}$.
+Las capacidades terminales son
+\begin{equation}
+ c(s,i)=\widetilde D_i(0;\theta)-m_i,
+\end{equation}
+\begin{equation}
+ c(i,t)=\widetilde D_i(1;\theta)-m_i.
+\end{equation}
+Cada par de vecinos interiores se conecta mediante dos arcos opuestos de
+capacidad $v_{ij}$. Si las etiquetas difieren, el costo del corte incluye
+una sola contribución $v_{ij}$.
+
+El flujo máximo se calcula mediante el algoritmo de Dinic~\cite{dinic1970},
+con tolerancia
+residual de $10^{-10}$ fijada en la implementación~\cite{cuaderno}. El procedimiento alterna la construcción de niveles
+en el grafo residual con el envío de flujo, hasta que el sumidero deja de
+ser alcanzable desde la fuente. Los píxeles interiores que permanecen
+alcanzables reciben la etiqueta uno; los demás reciben cero. Con los
+modelos fijos, la equivalencia entre flujo máximo y corte mínimo permite
+minimizar la energía binaria~\cite{boykov2001,szeliski2011} de la
+ecuación~\eqref{eq:energia-reducida}, salvo tolerancia numérica. Su valor se
+recupera sumando $\sum_{i\in R}m_i$ al flujo máximo.
+
+\subsection{Iteración y registro}
+
+La ejecución completa parte de las etiquetas de la
+ecuación~\eqref{eq:inicializacion} y de modelos recién inicializados.
+La ejecución configurada en el cuaderno realiza cinco
+iteraciones~\cite{cuaderno}. En cada una se asignan los componentes,
+se actualizan los parámetros gaussianos, se recalculan los costos y se
+obtiene un nuevo corte mínimo. El exterior del rectángulo y los pesos
+espaciales permanecen fijos. Se conserva la máscara de cada iteración y se
+registra el número de etiquetas modificadas. Las cinco iteraciones se
+ejecutan incluso si las etiquetas dejan de cambiar; no se utiliza una
+condición de parada basada en convergencia.
+
+Para cada iteración $\ell$, se comparan las energías anterior y posterior
+al corte con los mismos modelos actualizados $\theta^{(\ell)}$:
+\begin{equation}
+ E_R(\alpha^{(\ell)};\theta^{(\ell)})
+ \leq E_R(\alpha^{(\ell-1)};\theta^{(\ell)}).
+\end{equation}
+Esta propiedad corresponde al paso de corte. La estimación de parámetros
+emplea asignaciones únicas de componentes, mientras que el costo de
+clasificación utiliza la mezcla completa. Por ello, el reajuste de las
+gaussianas no garantiza una disminución de esta energía entre iteraciones.
+La máscara de la quinta iteración constituye el resultado final.
+
+\subsection{Evaluación por corte}
+
+La segmentación final $\widehat\alpha$ se compara con la referencia $g_i$
+definida en la ecuación~\eqref{eq:referencia-roja}. Para un dominio de
+evaluación $A\subseteq\Omega$, la métrica implementada en el
+cuaderno~\cite{cuaderno} es el error cuadrático medio:
+\begin{equation}
+ \operatorname{ECM}_A=\frac{1}{|A|}
+ \sum_{i\in A}(\widehat\alpha_i-g_i)^2.
+ \label{eq:ecm}
+\end{equation}
+Se calcula para la imagen completa ($A=\Omega$) y para el rectángulo
+($A=R$). Al tratarse de etiquetas binarias, cada discrepancia contribuye
+con uno; el error equivale a la proporción de píxeles mal clasificados.
+Además, se cuentan los falsos positivos y falsos negativos sobre toda la
+imagen y los píxeles de referencia que quedan fuera de $R$. Estos últimos
+no pueden recuperarse porque el exterior permanece fijado como fondo.
+
+Se incluye como comparación una predicción que asigna fondo a todos los
+píxeles. Esta comparación permite interpretar un error global pequeño
+cuando la lesión ocupa una fracción reducida de la imagen. La inspección
+visual reúne la anotación, la máscara de referencia, la segmentación y un
+mapa de errores dentro del rectángulo. Las métricas globales incluyen los
+errores exteriores que no aparecen en esa visualización.
+
+\subsection{Disponibilidad del código y aplicación web}
+\label{sec:disponibilidad}
+
+Todo el código del proyecto se encuentra en el repositorio
+\textit{horus-grabcut}~\cite{repositorio}, disponible en
+\url{https://github.com/DarthFranco2001/horus-grabcut}.
+El cuaderno de procesamiento se ubica en \path{notebooks/}; el código de
+la aplicación web y sus pruebas, en \path{web/}; y las imágenes y
+anotaciones utilizadas, en \path{data/}. La referencia al cuaderno
+identifica la copia local de la que proceden las salidas de este reporte.
+
+La aplicación \href{https://darthfranco2001.github.io/horus-grabcut/}{\textit{Laboratorio GrabCut}}~\cite{web} está disponible en línea.
+Permite seleccionar un caso, delimitar el rectángulo de interés, ejecutar
+la segmentación y consultar la comparación con la referencia. El
+procesamiento se realiza en el navegador. La aplicación ofrece un medio
+interactivo para explorar el procedimiento; los resultados cuantitativos
+presentados en este reporte corresponden a la ejecución del cuaderno
+descrita en la sección~\ref{sec:resultados}.

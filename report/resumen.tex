@@ -1,0 +1,17 @@
+% !TeX root = main.tex
+Se estudia una implementación de segmentación interactiva basada en
+GrabCut para delimitar schwannoma vestibular en cortes de resonancia
+magnética. El conjunto de trabajo comprende 30 imágenes PNG asociadas a
+la colección Vestibular-Schwannoma-SEG. El procedimiento inicializa las
+etiquetas mediante un rectángulo, modela las intensidades de fondo y primer
+plano con cinco gaussianas por clase y alterna la actualización de estos
+modelos con cortes mínimos en un grafo de ocho vecinos. La evaluación
+presentada corresponde al caso \texttt{VS-SEG-001} y utiliza una máscara
+binaria extraída de su anotación roja. Tras cinco iteraciones, se
+obtuvieron 47 falsos positivos y 84 falsos negativos, con un error
+cuadrático medio de $0{,}000500$ sobre la imagen completa y de
+$0{,}026422$ dentro del rectángulo. Las discrepancias se redujeron un
+$92{,}25$~\% respecto de una predicción de todo fondo. Las etiquetas
+permanecieron sin cambios desde la tercera iteración hasta la quinta,
+aunque los modelos de intensidad continuaron actualizándose. El
+análisis ilustra el comportamiento del procedimiento en el corte seleccionado.

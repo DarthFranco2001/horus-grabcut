@@ -1,0 +1,86 @@
+% !TeX root = main.tex
+\section{Datos}
+\label{sec:datos}
+
+\subsection{Procedencia y adquisición}
+
+Se utilizan imágenes de resonancia magnética de la colección
+\textit{Vestibular-Schwannoma-SEG}, publicada por Shapey y colaboradores en
+The Cancer Imaging Archive~\cite{clark2013}. La colección comprende 242 pacientes adultos con
+schwannoma vestibular unilateral esporádico tratados mediante radiocirugía
+estereotáctica con Gamma Knife. Cada caso incluye imágenes ponderadas en T1
+con contraste y en T2 de alta resolución, junto con estructuras segmentadas
+y datos de planificación de radioterapia. Los datos se distribuyen bajo la
+licencia de atribución CC BY 4.0~\cite{shapeydatos}.
+
+Las imágenes originales se adquirieron con un resonador Siemens Avanto de
+1,5~T. La adquisición T1 con contraste empleó una secuencia MPRAGE, con una
+matriz de $512\times512$ píxeles y una resolución en el plano de
+$0{,}4\times0{,}4$~mm. La adquisición T2 de alta resolución empleó una
+secuencia 3D CISS, con matrices de $384\times384$ o $448\times448$ píxeles y
+una resolución en el plano de aproximadamente $0{,}5\times0{,}5$~mm. El
+espesor de corte fue de 1,0 a 1,5~mm. Las estructuras de referencia fueron
+delimitadas por el equipo clínico mediante Leksell GammaPlan, empleando
+las imágenes T1 con contraste y T2 de alta resolución. Estos parámetros describen
+la adquisición clínica de la colección~\cite{shapey2021}.
+
+\subsection{Selección y preparación de las imágenes}
+
+El conjunto de trabajo comprende 30 imágenes bidimensionales, una por cada
+caso identificado desde \texttt{VS-SEG-001} hasta \texttt{VS-SEG-030}. Según
+la selección documentada en la presentación del proyecto~\cite{presentacion}, 13 cortes
+corresponden a T1 con contraste y 17 a T2 de alta resolución. La
+tabla~\ref{tab:composicion-datos} resume esta composición y las dimensiones
+verificadas en los archivos. La distribución de tamaños concuerda con las
+matrices de adquisición publicadas~\cite{shapey2021}.
+
+\begin{table}[htbp]
+\centering
+\caption{Composición del conjunto de trabajo. La secuencia corresponde a la
+clasificación documentada en la presentación; las dimensiones y cantidades
+se verificaron en los archivos del repositorio~\cite{cuaderno}.}
+\label{tab:composicion-datos}
+\begin{tabular}{lrr}
+\toprule
+Secuencia & Dimensiones (píxeles) & Cantidad \\
+\midrule
+T1 con contraste & $512\times512$ & 13 \\
+T2 de alta resolución & $448\times448$ & 16 \\
+T2 de alta resolución & $384\times384$ & 1 \\
+\midrule
+Total & & 30 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Las imágenes se extrajeron y convirtieron a PNG, tanto en su versión sin
+superposición como en su versión con la anotación roja. El repositorio conserva las primeras en
+\texttt{data/images/}, en escala de grises de 8 bits, y las segundas en
+\texttt{data/contours/}, con canales rojo, verde y azul. Ambos archivos
+comparten el identificador del caso. El análisis utiliza estos cortes
+bidimensionales como unidades de procesamiento.
+
+\subsection{Referencia de segmentación}
+
+La implementación extrae una máscara binaria de la anotación
+roja~\cite{cuaderno}. Para el píxel
+$i$, sean $r_i$, $v_i$ y $b_i$ las intensidades de los canales rojo, verde y
+azul, respectivamente. La etiqueta de referencia se define como
+\begin{equation}
+ g_i =
+ \begin{cases}
+  1, & r_i > v_i \text{ y } r_i > b_i,\\
+  0, & \text{en otro caso}.
+ \end{cases}
+ \label{eq:referencia-roja}
+\end{equation}
+La referencia contiene entre 70 y 2748 píxeles positivos por imagen. En los
+30 casos se verificó que la imagen y su anotación tienen las mismas
+dimensiones y que todos los píxeles exteriores a la región roja coinciden
+exactamente. Esta comprobación respalda la correspondencia espacial entre
+los archivos locales. La máscara se utiliza para evaluar la segmentación;
+no se suministra como etiqueta de entrada a GrabCut.
+
+La máscara obtenida mediante la ecuación~\eqref{eq:referencia-roja}
+permite comparar la segmentación calculada con la región marcada en la
+anotación de cada imagen.

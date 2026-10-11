@@ -1,0 +1,66 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage[font=small,labelfont=bf,skip=6pt]{caption}
+\usepackage{placeins}
+\usepackage[hidelinks]{hyperref}
+\addto\captionsspanish{\renewcommand{\tablename}{Tabla}}
+
+% Permitir que las figuras compartan página con el texto.
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.8}
+\renewcommand{\textfraction}{0.08}
+\renewcommand{\floatpagefraction}{0.85}
+\setlength{\textfloatsep}{14pt plus 2pt minus 2pt}
+\setlength{\intextsep}{12pt plus 2pt minus 2pt}
+\clubpenalty=10000
+\widowpenalty=10000
+
+% Carpetas donde buscar imágenes, relativas a report/.
+\graphicspath{{figures/}{../data/images/}{../data/contours/}}
+
+\title{Reporte de segmentación con GrabCut}
+\author{Franco Castro Chaves\\C01886 \and Emily Chacón Araya\\C02047}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\input{resumen}
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\input{introduccion}
+
+\input{datos}
+
+\input{metodologia}
+
+\input{resultados}
+
+% Descomenta cuando exista report/figures/resultado.png:
+%
+% \begin{figure}[htbp]
+%   \centering
+%   \includegraphics[width=0.85\textwidth]{resultado.png}
+%   \caption{Resultado de la segmentación con GrabCut.}
+%   \label{fig:resultado}
+% \end{figure}
+
+\FloatBarrier
+\input{conclusiones}
+
+\clearpage
+\input{referencias}
+
+\end{document}

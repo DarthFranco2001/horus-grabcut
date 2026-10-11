@@ -1,0 +1,29 @@
+% !TeX root = main.tex
+\section{Conclusiones}
+\label{sec:conclusiones}
+
+La implementación de segmentación interactiva basada en GrabCut permitió
+obtener una región compatible con la referencia disponible para el corte
+\texttt{VS-SEG-001}, a partir de una inicialización rectangular. Tras cinco
+iteraciones, se registraron 47 falsos positivos y 84 falsos negativos. El
+error cuadrático medio fue de $0{,}000500$ sobre la imagen completa y de
+$0{,}026422$ dentro del rectángulo. Frente a la predicción que asigna fondo
+a todos los píxeles, las discrepancias se redujeron aproximadamente un
+$92{,}25$~\% en este caso.
+
+Las etiquetas permanecieron sin cambios desde la tercera iteración hasta
+la quinta, aunque los modelos de intensidad continuaron actualizándose.
+El procedimiento combina así el ajuste de los modelos de intensidad con
+la minimización de la energía mediante cortes de grafos.
+
+El predominio del fondo hace que el error global sea pequeño incluso
+cuando se omite toda la lesión. Por ello, su interpretación requiere
+considerar también el error dentro del rectángulo, los falsos positivos y
+negativos y su distribución espacial. En el caso evaluado, las
+discrepancias se concentraron en el límite de la región segmentada.
+
+El caso estudiado ilustra la aplicación de GrabCut a la segmentación
+interactiva de una lesión en resonancia magnética. La inicialización
+rectangular delimita la región de búsqueda, los modelos gaussianos
+describen las intensidades de ambas clases y los enlaces entre vecinos
+favorecen la coherencia espacial de la región obtenida.

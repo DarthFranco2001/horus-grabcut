@@ -1,0 +1,45 @@
+% !TeX root = main.tex
+\section{Introducción}
+\label{sec:introduccion}
+
+La segmentación de imágenes asigna etiquetas a los píxeles para delimitar
+regiones de interés~\cite{szeliski2011}. En una imagen de resonancia magnética, la delimitación
+de una lesión requiere distinguirla de los tejidos circundantes a partir
+de su apariencia y de su organización espacial. Cuando distintas regiones
+presentan intensidades semejantes, una clasificación basada únicamente en
+la intensidad puede producir ambigüedades. Incorporar relaciones entre
+píxeles vecinos permite favorecer regiones coherentes, mientras que una
+selección interactiva restringe la búsqueda a la zona de interés~\cite{boykov2001}.
+
+GrabCut combina modelos de apariencia de fondo y primer plano con una
+penalización espacial dependiente del contraste. El procedimiento alterna
+la estimación de estos modelos con la actualización de etiquetas mediante
+cortes de grafos. Una inicialización rectangular permite indicar la región
+que contiene el objeto sin trazar de antemano su borde completo~\cite{rother2004}.
+La segmentación obtenida depende tanto de la información de la imagen como
+de la restricción introducida por ese rectángulo.
+
+En este trabajo se estudia una implementación de segmentación interactiva
+basada en GrabCut aplicada a cortes de resonancia magnética de schwannoma
+vestibular. Se utiliza un conjunto de trabajo de 30 imágenes PNG asociado
+a la colección \textit{Vestibular-Schwannoma-SEG}~\cite{shapeydatos}, cuya procedencia y
+preparación se describen en la sección~\ref{sec:datos}. Las imágenes se
+procesan individualmente en escala de grises. Para cada corte, la región
+candidata se delimita mediante un rectángulo y se construyen modelos de
+mezclas gaussianas para ambas clases. La coherencia espacial se incorpora
+mediante una vecindad de ocho píxeles y las etiquetas se actualizan por
+corte mínimo. La anotación roja disponible se transforma en una máscara
+binaria destinada a la evaluación.
+
+El objetivo es describir la relación entre la inicialización interactiva,
+los modelos de intensidad y la optimización espacial, y examinar la
+segmentación resultante mediante comparaciones con la referencia. Se
+registra la evolución de las etiquetas y de la energía durante cinco
+iteraciones. La evaluación considera el error cuadrático medio sobre la
+imagen completa y sobre el rectángulo, los falsos positivos y negativos y
+su distribución espacial. Se incluye una predicción de todo fondo para
+interpretar el efecto del predominio de esta clase en el error global.
+
+El procedimiento se ilustra con el caso \texttt{VS-SEG-001}, para el que
+se presentan la evolución de la segmentación y la comparación con su
+anotación de referencia.

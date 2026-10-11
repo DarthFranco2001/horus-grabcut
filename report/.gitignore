@@ -1,0 +1,3 @@
+# Archivos auxiliares de LaTeX; conservar el PDF para la entrega.
+build/*
+!build/main.pdf
